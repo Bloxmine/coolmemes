@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pose Editor - Meme Magic Mirror</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 0;
+        }
+
+        .canvas-section {
+            padding: 30px;
+            border-right: 2px solid #e0e0e0;
+        }
+
+        #pose-canvas {
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            cursor: crosshair;
+            background: #f5f5f5;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .controls-section {
+            padding: 30px;
+            background: #fafafa;
+            overflow-y: auto;
+            max-height: 800px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+            transform: translateY(-2px);
+        }
+
+        .pose-list {
+            margin-top: 20px;
+        }
+
+        .pose-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 2px solid #e0e0e0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .pose-item:hover {
+            border-color: #667eea;
+            transform: translateX(5px);
+        }
+
+        .pose-item.active {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .pose-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .pose-item-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .pose-item-emoji {
+            font-size: 24px;
+        }
+
+        .pose-item-text {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .delete-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .delete-btn:hover {
+            background: #dc2626;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .keypoint-list {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .keypoint-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+
+        .keypoint-item:last-child {
+            border-bottom: none;
+        }
+
+        .keypoint-name {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .keypoint-coords {
+            color: #888;
+            font-family: monospace;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .instructions {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .instructions h3 {
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .instructions ul {
+            margin-left: 20px;
+            color: #856404;
+        }
+
+        .instructions li {
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+        
+        .toolbar {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tool-btn {
+            padding: 10px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .tool-btn:hover {
+            background: #f0f4ff;
+        }
+        
+        .tool-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .selection-info {
+            margin-left: auto;
+            color: #667eea;
+            font-weight: 600;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎭 Pose Editor</h1>
+            <p>Design custom poses for your Meme Magic Mirror</p>
+        </div>
+
+        <div class="content">
+            <div class="canvas-section">
+                <div class="instructions">
+                    <h3>📝 How to Use:</h3>
+                    <ul>
+                        <li><strong>Move Tool:</strong> Click and drag individual dots to position body parts</li>
+                        <li><strong>Select Tool:</strong> Draw a rectangle to select multiple points, then drag them together</li>
+                        <li><strong>Shortcuts:</strong> Ctrl/Cmd+A (select all), Escape (deselect), Delete (reset selected)</li>
+                        <li><strong>Set conditions</strong> in the right panel to define when this pose is detected</li>
+                    </ul>
+                </div>
+                <div class="toolbar">
+                    <button class="tool-btn active" id="move-tool" onclick="setTool('move')">✋ Move</button>
+                    <button class="tool-btn" id="select-tool" onclick="setTool('select')">⬛ Select</button>
+                    <button class="tool-btn" onclick="selectAll()">Select All</button>
+                    <button class="tool-btn" onclick="deselectAll()">Deselect</button>
+                    <span class="selection-info" id="selection-info">0 points selected</span>
+                </div>
+                <canvas id="pose-canvas" width="600" height="600"></canvas>
+                <div class="keypoint-list" id="keypoint-list">
+                    <strong>Keypoint Positions:</strong>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <div class="section-title">✨ Pose Settings</div>
+                
+                <div class="form-group">
+                    <label>Pose ID (unique)</label>
+                    <input type="text" id="pose-id" placeholder="e.g., arms_up">
+                    <div class="help-text">Use underscores, no spaces</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Meme Name</label>
+                    <input type="text" id="meme-name" placeholder="e.g., 🎉 CELEBRATION TIME! 🎉">
+                </div>
+
+                <div class="form-group">
+                    <label>Meme Text</label>
+                    <input type="text" id="meme-text" placeholder="e.g., Achievement Unlocked!">
+                </div>
+
+                <div class="form-group">
+                    <label>Emoji</label>
+                    <input type="text" id="meme-emoji" placeholder="e.g., 🎊" maxlength="2">
+                </div>
+
+                <div class="form-group">
+                    <label>Image Path</label>
+                    <input type="text" id="meme-image" placeholder="e.g., poses/dab.gif">
+                    <div class="help-text">Path to .jpg or .gif image file</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Detection Conditions (JavaScript)</label>
+                    <textarea id="pose-conditions" placeholder="e.g., leftWrist.y < leftShoulder.y - 50 && rightWrist.y < rightShoulder.y - 50"></textarea>
+                    <div class="help-text">Write JavaScript condition using keypoint names</div>
+                </div>
+
+                <button class="btn btn-primary" onclick="savePose()">💾 Save Pose</button>
+                <button class="btn btn-success" onclick="addNewPose()">➕ New Pose</button>
+
+                <div class="section-title" style="margin-top: 30px;">📋 Saved Poses</div>
+                <div class="pose-list" id="pose-list"></div>
+
+                <div class="section-title" style="margin-top: 30px;">📤 Export / Import</div>
+                
+                <button class="btn btn-primary" onclick="exportToJSON()">📥 Download JSON</button>
+                
+                <div class="file-input-wrapper">
+                    <button class="btn btn-secondary">📂 Load JSON File</button>
+                    <input type="file" id="json-file-input" accept=".json" onchange="importFromJSON(event)">
+                </div>
+
+                <button class="btn btn-danger" onclick="clearAllPoses()" style="margin-top: 20px;">🗑️ Clear All Poses</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('pose-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Default skeleton structure
+        const keypoints = {
+            nose: { x: 300, y: 150, color: '#ff6b6b' },
+            leftEye: { x: 280, y: 140, color: '#4ecdc4' },
+            rightEye: { x: 320, y: 140, color: '#4ecdc4' },
+            leftEar: { x: 260, y: 150, color: '#ffe66d' },
+            rightEar: { x: 340, y: 150, color: '#ffe66d' },
+            leftShoulder: { x: 250, y: 220, color: '#a8e6cf' },
+            rightShoulder: { x: 350, y: 220, color: '#a8e6cf' },
+            leftElbow: { x: 200, y: 300, color: '#ffd3b6' },
+            rightElbow: { x: 400, y: 300, color: '#ffd3b6' },
+            leftWrist: { x: 180, y: 380, color: '#ffaaa5' },
+            rightWrist: { x: 420, y: 380, color: '#ffaaa5' },
+            leftHip: { x: 270, y: 380, color: '#ff8b94' },
+            rightHip: { x: 330, y: 380, color: '#ff8b94' },
+            leftKnee: { x: 260, y: 480, color: '#c7ceea' },
+            rightKnee: { x: 340, y: 480, color: '#c7ceea' },
+            leftAnkle: { x: 250, y: 560, color: '#b4a7d6' },
+            rightAnkle: { x: 350, y: 560, color: '#b4a7d6' }
+        };
+
+        const skeleton = [
+            ['nose', 'leftEye'],
+            ['leftEye', 'leftEar'],
+            ['nose', 'rightEye'],
+            ['rightEye', 'rightEar'],
+            ['nose', 'leftShoulder'],
+            ['nose', 'rightShoulder'],
+            ['leftShoulder', 'leftElbow'],
+            ['leftElbow', 'leftWrist'],
+            ['rightShoulder', 'rightElbow'],
+            ['rightElbow', 'rightWrist'],
+            ['leftShoulder', 'rightShoulder'],
+            ['leftShoulder', 'leftHip'],
+            ['rightShoulder', 'rightHip'],
+            ['leftHip', 'rightHip'],
+            ['leftHip', 'leftKnee'],
+            ['leftKnee', 'leftAnkle'],
+            ['rightHip', 'rightKnee'],
+            ['rightKnee', 'rightAnkle']
+        ];
+
+        let poses = [];
+        let currentPoseIndex = -1;
+        let draggingPoint = null;
+        let selectedPoints = new Set();
+        let currentTool = 'move'; // 'move' or 'select'
+        let selectionStart = null;
+        let selectionEnd = null;
+        let isDraggingSelection = false;
+        let dragStartPos = null;
+        let originalPositions = {};
+
+        // Mouse handling
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (currentTool === 'move') {
+                // Check if clicking on a selected point
+                let clickedSelected = false;
+                for (let key of selectedPoints) {
+                    const kp = keypoints[key];
+                    const dist = Math.sqrt((x - kp.x) ** 2 + (y - kp.y) ** 2);
+                    if (dist < 15) {
+                        clickedSelected = true;
+                        break;
+                    }
+                }
+                
+                if (clickedSelected && selectedPoints.size > 0) {
+                    // Start dragging all selected points
+                    isDraggingSelection = true;
+                    dragStartPos = { x, y };
+                    originalPositions = {};
+                    for (let key of selectedPoints) {
+                        originalPositions[key] = { ...keypoints[key] };
+                    }
+                } else {
+                    // Normal single point drag
+                    for (let key in keypoints) {
+                        const kp = keypoints[key];
+                        const dist = Math.sqrt((x - kp.x) ** 2 + (y - kp.y) ** 2);
+                        if (dist < 15) {
+                            draggingPoint = key;
+                            if (!e.shiftKey) {
+                                selectedPoints.clear();
+                            }
+                            selectedPoints.add(key);
+                            updateSelectionInfo();
+                            break;
+                        }
+                    }
+                }
+            } else if (currentTool === 'select') {
+                // Start selection rectangle
+                selectionStart = { x, y };
+                selectionEnd = { x, y };
+                if (!e.shiftKey) {
+                    selectedPoints.clear();
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.max(0, Math.min(canvas.width, e.clientX - rect.left));
+            const y = Math.max(0, Math.min(canvas.height, e.clientY - rect.top));
+            
+            if (isDraggingSelection) {
+                // Drag all selected points
+                const dx = x - dragStartPos.x;
+                const dy = y - dragStartPos.y;
+                
+                for (let key of selectedPoints) {
+                    keypoints[key].x = Math.max(0, Math.min(canvas.width, originalPositions[key].x + dx));
+                    keypoints[key].y = Math.max(0, Math.min(canvas.height, originalPositions[key].y + dy));
+                }
+                
+                drawSkeleton();
+                updateKeypointList();
+            } else if (draggingPoint) {
+                keypoints[draggingPoint].x = x;
+                keypoints[draggingPoint].y = y;
+                
+                drawSkeleton();
+                updateKeypointList();
+            } else if (selectionStart) {
+                // Update selection rectangle
+                selectionEnd = { x, y };
+                drawSkeleton();
+                drawSelectionRectangle();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (selectionStart && selectionEnd) {
+                // Complete selection
+                const minX = Math.min(selectionStart.x, selectionEnd.x);
+                const maxX = Math.max(selectionStart.x, selectionEnd.x);
+                const minY = Math.min(selectionStart.y, selectionEnd.y);
+                const maxY = Math.max(selectionStart.y, selectionEnd.y);
+                
+                for (let key in keypoints) {
+                    const kp = keypoints[key];
+                    if (kp.x >= minX && kp.x <= maxX && kp.y >= minY && kp.y <= maxY) {
+                        selectedPoints.add(key);
+                    }
+                }
+                
+                selectionStart = null;
+                selectionEnd = null;
+                updateSelectionInfo();
+                drawSkeleton();
+            }
+            
+            draggingPoint = null;
+            isDraggingSelection = false;
+            dragStartPos = null;
+            originalPositions = {};
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + A: Select all
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                e.preventDefault();
+                selectAll();
+            }
+            // Escape: Deselect all
+            else if (e.key === 'Escape') {
+                deselectAll();
+            }
+            // Delete: Reset selected points to default
+            else if (e.key === 'Delete' && selectedPoints.size > 0) {
+                resetSelectedPoints();
+            }
+        });
+
+        function drawSkeleton() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw skeleton lines
+            ctx.strokeStyle = '#999';
+            ctx.lineWidth = 3;
+            skeleton.forEach(([a, b]) => {
+                ctx.beginPath();
+                ctx.moveTo(keypoints[a].x, keypoints[a].y);
+                ctx.lineTo(keypoints[b].x, keypoints[b].y);
+                ctx.stroke();
+            });
+
+            // Draw keypoints
+            for (let key in keypoints) {
+                const kp = keypoints[key];
+                const isSelected = selectedPoints.has(key);
+                
+                ctx.fillStyle = kp.color;
+                ctx.beginPath();
+                ctx.arc(kp.x, kp.y, isSelected ? 12 : 10, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Selection highlight
+                if (isSelected) {
+                    ctx.strokeStyle = '#667eea';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+                
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Draw label
+                ctx.fillStyle = isSelected ? '#667eea' : '#333';
+                ctx.font = isSelected ? 'bold 11px sans-serif' : '11px sans-serif';
+                ctx.fillText(key, kp.x + 15, kp.y + 5);
+            }
+        }
+        
+        function drawSelectionRectangle() {
+            if (!selectionStart || !selectionEnd) return;
+            
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(
+                selectionStart.x,
+                selectionStart.y,
+                selectionEnd.x - selectionStart.x,
+                selectionEnd.y - selectionStart.y
+            );
+            ctx.setLineDash([]);
+            
+            ctx.fillStyle = 'rgba(102, 126, 234, 0.1)';
+            ctx.fillRect(
+                selectionStart.x,
+                selectionStart.y,
+                selectionEnd.x - selectionStart.x,
+                selectionEnd.y - selectionStart.y
+            );
+        }
+        
+        function setTool(tool) {
+            currentTool = tool;
+            document.getElementById('move-tool').classList.toggle('active', tool === 'move');
+            document.getElementById('select-tool').classList.toggle('active', tool === 'select');
+            canvas.style.cursor = tool === 'move' ? 'crosshair' : 'crosshair';
+        }
+        
+        function selectAll() {
+            selectedPoints.clear();
+            for (let key in keypoints) {
+                selectedPoints.add(key);
+            }
+            updateSelectionInfo();
+            drawSkeleton();
+        }
+        
+        function deselectAll() {
+            selectedPoints.clear();
+            updateSelectionInfo();
+            drawSkeleton();
+        }
+        
+        function updateSelectionInfo() {
+            const info = document.getElementById('selection-info');
+            const count = selectedPoints.size;
+            info.textContent = `${count} point${count !== 1 ? 's' : ''} selected`;
+        }
+        
+        function resetSelectedPoints() {
+            if (selectedPoints.size === 0) return;
+            
+            if (!confirm(`Reset ${selectedPoints.size} selected point${selectedPoints.size !== 1 ? 's' : ''} to default position?`)) {
+                return;
+            }
+            
+            const defaults = {
+                nose: { x: 300, y: 150 },
+                leftEye: { x: 280, y: 140 },
+                rightEye: { x: 320, y: 140 },
+                leftEar: { x: 260, y: 150 },
+                rightEar: { x: 340, y: 150 },
+                leftShoulder: { x: 250, y: 220 },
+                rightShoulder: { x: 350, y: 220 },
+                leftElbow: { x: 200, y: 300 },
+                rightElbow: { x: 400, y: 300 },
+                leftWrist: { x: 180, y: 380 },
+                rightWrist: { x: 420, y: 380 },
+                leftHip: { x: 270, y: 380 },
+                rightHip: { x: 330, y: 380 },
+                leftKnee: { x: 260, y: 480 },
+                rightKnee: { x: 340, y: 480 },
+                leftAnkle: { x: 250, y: 560 },
+                rightAnkle: { x: 350, y: 560 }
+            };
+            
+            for (let key of selectedPoints) {
+                if (defaults[key]) {
+                    keypoints[key].x = defaults[key].x;
+                    keypoints[key].y = defaults[key].y;
+                }
+            }
+            
+            drawSkeleton();
+            updateKeypointList();
+        }
+
+        function updateKeypointList() {
+            const list = document.getElementById('keypoint-list');
+            let html = '<strong>Keypoint Positions:</strong>';
+            for (let key in keypoints) {
+                html += `
+                    <div class="keypoint-item">
+                        <span class="keypoint-name">${key}</span>
+                        <span class="keypoint-coords">x: ${Math.round(keypoints[key].x)}, y: ${Math.round(keypoints[key].y)}</span>
+                    </div>
+                `;
+            }
+            list.innerHTML = html;
+        }
+
+        function savePose() {
+            const poseId = document.getElementById('pose-id').value.trim();
+            const memeName = document.getElementById('meme-name').value.trim();
+            const memeText = document.getElementById('meme-text').value.trim();
+            const memeEmoji = document.getElementById('meme-emoji').value.trim();
+            const memeImage = document.getElementById('meme-image').value.trim();
+            const conditions = document.getElementById('pose-conditions').value.trim();
+
+            if (!poseId) {
+                alert('Please enter a Pose ID!');
+                return;
+            }
+
+            const poseData = {
+                id: poseId,
+                meme: {
+                    name: memeName || `Pose: ${poseId}`,
+                    text: memeText || 'Strike a pose!',
+                    emoji: memeEmoji || '✨',
+                    image: memeImage || `poses/${poseId}.jpg`
+                },
+                keypoints: JSON.parse(JSON.stringify(keypoints)),
+                conditions: conditions
+            };
+
+            if (currentPoseIndex >= 0) {
+                poses[currentPoseIndex] = poseData;
+            } else {
+                poses.push(poseData);
+            }
+
+            renderPoseList();
+            alert('Pose saved!');
+        }
+
+        function addNewPose() {
+            currentPoseIndex = -1;
+            document.getElementById('pose-id').value = '';
+            document.getElementById('meme-name').value = '';
+            document.getElementById('meme-text').value = '';
+            document.getElementById('meme-emoji').value = '';
+            document.getElementById('meme-image').value = '';
+            document.getElementById('pose-conditions').value = '';
+            
+            // Reset to default pose
+            resetKeypointsToDefault();
+            deselectAll();
+        }
+
+        function resetKeypointsToDefault() {
+            keypoints.nose = { x: 300, y: 150, color: '#ff6b6b' };
+            keypoints.leftEye = { x: 280, y: 140, color: '#4ecdc4' };
+            keypoints.rightEye = { x: 320, y: 140, color: '#4ecdc4' };
+            keypoints.leftEar = { x: 260, y: 150, color: '#ffe66d' };
+            keypoints.rightEar = { x: 340, y: 150, color: '#ffe66d' };
+            keypoints.leftShoulder = { x: 250, y: 220, color: '#a8e6cf' };
+            keypoints.rightShoulder = { x: 350, y: 220, color: '#a8e6cf' };
+            keypoints.leftElbow = { x: 200, y: 300, color: '#ffd3b6' };
+            keypoints.rightElbow = { x: 400, y: 300, color: '#ffd3b6' };
+            keypoints.leftWrist = { x: 180, y: 380, color: '#ffaaa5' };
+            keypoints.rightWrist = { x: 420, y: 380, color: '#ffaaa5' };
+            keypoints.leftHip = { x: 270, y: 380, color: '#ff8b94' };
+            keypoints.rightHip = { x: 330, y: 380, color: '#ff8b94' };
+            keypoints.leftKnee = { x: 260, y: 480, color: '#c7ceea' };
+            keypoints.rightKnee = { x: 340, y: 480, color: '#c7ceea' };
+            keypoints.leftAnkle = { x: 250, y: 560, color: '#b4a7d6' };
+            keypoints.rightAnkle = { x: 350, y: 560, color: '#b4a7d6' };
+            
+            selectedPoints.clear();
+            updateSelectionInfo();
+            drawSkeleton();
+            updateKeypointList();
+        }
+
+        function loadPose(index) {
+            currentPoseIndex = index;
+            const pose = poses[index];
+            
+            document.getElementById('pose-id').value = pose.id;
+            document.getElementById('meme-name').value = pose.meme.name;
+            document.getElementById('meme-text').value = pose.meme.text;
+            document.getElementById('meme-emoji').value = pose.meme.emoji;
+            document.getElementById('meme-image').value = pose.meme.image || '';
+            document.getElementById('pose-conditions').value = pose.conditions || '';
+            
+            // Load keypoints
+            for (let key in pose.keypoints) {
+                keypoints[key].x = pose.keypoints[key].x;
+                keypoints[key].y = pose.keypoints[key].y;
+            }
+            
+            deselectAll();
+            drawSkeleton();
+            updateKeypointList();
+            renderPoseList();
+        }
+
+        function deletePose(index, event) {
+            event.stopPropagation();
+            if (confirm('Delete this pose?')) {
+                poses.splice(index, 1);
+                if (currentPoseIndex === index) {
+                    addNewPose();
+                }
+                renderPoseList();
+            }
+        }
+
+        function renderPoseList() {
+            const list = document.getElementById('pose-list');
+            if (poses.length === 0) {
+                list.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">No poses saved yet</p>';
+                return;
+            }
+
+            let html = '';
+            poses.forEach((pose, index) => {
+                const isActive = index === currentPoseIndex ? 'active' : '';
+                html += `
+                    <div class="pose-item ${isActive}" onclick="loadPose(${index})">
+                        <div class="pose-item-header">
+                            <span class="pose-item-name">${pose.id}</span>
+                            <div>
+                                <span class="pose-item-emoji">${pose.meme.emoji}</span>
+                                <button class="delete-btn" onclick="deletePose(${index}, event)">×</button>
+                            </div>
+                        </div>
+                        <div class="pose-item-text">${pose.meme.text}</div>
+                    </div>
+                `;
+            });
+            list.innerHTML = html;
+        }
+
+        function exportToJSON() {
+            if (poses.length === 0) {
+                alert('No poses to export! Save some poses first.');
+                return;
+            }
+
+            const exportData = {
+                memes: {},
+                poseDetection: {}
+            };
+
+            poses.forEach(pose => {
+                exportData.memes[pose.id] = {
+                    name: pose.meme.name,
+                    text: pose.meme.text,
+                    emoji: pose.meme.emoji
+                };
+                
+                exportData.poseDetection[pose.id] = {
+                    keypoints: pose.keypoints,
+                    conditions: pose.conditions
+                };
+            });
+
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'poses.json';
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importFromJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    poses = [];
+                    for (let id in data.memes) {
+                        poses.push({
+                            id: id,
+                            meme: data.memes[id],
+                            keypoints: data.poseDetection[id]?.keypoints || {},
+                            conditions: data.poseDetection[id]?.conditions || ''
+                        });
+                    }
+                    
+                    renderPoseList();
+                    alert(`Loaded ${poses.length} poses!`);
+                } catch (error) {
+                    alert('Error loading JSON file: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function clearAllPoses() {
+            if (confirm('Are you sure you want to delete all poses? This cannot be undone!')) {
+                poses = [];
+                currentPoseIndex = -1;
+                addNewPose();
+                renderPoseList();
+            }
+        }
+
+        // Initialize
+        drawSkeleton();
+        updateKeypointList();
+        renderPoseList();
+        updateSelectionInfo();
+    </script>
+</body>
+</html>

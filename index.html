@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meme Magic Mirror</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: black;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        #canvas-container {
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        
+        #pose-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 18px;
+            z-index: 1000;
+        }
+        
+        .meme-text {
+            font-weight: bold;
+            color: #ffd700;
+            margin-top: 5px;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .control-btn {
+            background: rgba(102, 126, 234, 0.9);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 10px;
+            display: block;
+            transition: all 0.3s;
+        }
+        
+        .control-btn:hover {
+            background: rgba(102, 126, 234, 1);
+            transform: translateY(-2px);
+        }
+        
+        #json-file-input {
+            display: none;
+        }
+        
+        #pose-image {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            z-index: 500;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        #pose-image.show {
+            opacity: 0.9;
+            animation: pulseFlash 0.6s ease-out;
+        }
+        
+        @keyframes pulseFlash {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            25% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(0.95);
+                opacity: 0.7;
+            }
+            75% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 0.9;
+            }
+        }
+    </style>
+</head>
+<body>
+    <img id="pose-image" src="" alt="">
+    
+    <audio id="boom-sound" preload="auto">
+        <source src="sounds/vine-boom.mp3" type="audio/mpeg">
+    </audio>
+    <div id="pose-info">
+        <div>Initializing camera...</div>
+        <div class="meme-text" id="meme-name"></div>
+    </div>
+    
+    <div id="controls">
+        <button class="control-btn" onclick="document.getElementById('json-file-input').click()">📂 Load Poses</button>
+        <button class="control-btn" onclick="window.open('pose-editor.html', '_blank')">🎭 Pose Editor</button>
+        <input type="file" id="json-file-input" accept=".json" onchange="loadPosesFromJSON(event)">
+    </div>
+    
+    <script>
+        let video;
+        let poseNet;
+        let poses = [];
+        let currentMeme = "default";
+        let confirmedMeme = "default"; // The pose that's actually registered
+        let customPoseDetection = {}; // Store custom pose detection logic
+        
+        // Pose holding mechanism
+        let detectedPose = "default";
+        let poseHoldTime = 0;
+        let lastPoseChangeTime = 0;
+        const HOLD_DURATION = 1500; // 1.5 seconds in milliseconds
+        const MIN_CHANGE_INTERVAL = 2000; // Minimum 2 seconds between pose changes
+        
+        // Sound
+        const boomSound = document.getElementById('boom-sound');
+        const poseImage = document.getElementById('pose-image');
+        
+        // Meme images - using emoji-based memes for simplicity
+        let memes = {
+            "arms_up": {
+                name: "🎉 CELEBRATION TIME! 🎉",
+                text: "Achievement Unlocked!",
+                emoji: "🎊"
+            },
+            "t_pose": {  // 
+                name: "💪 T-POSE DOMINANCE 💪",
+                text: "Assert Your Dominance",
+                emoji: "😎"
+            },
+            "dab": {
+                name: "👋 DAB ON 'EM 👋",
+                text: "Epic Dab Detected",
+                emoji: "🔥"
+            },
+            "hands_on_hips": {
+                name: "💁 SASSY MODE 💁",
+                text: "Confidence Level: Maximum",
+                emoji: "💅"
+            },
+            "arms_behind_head": {
+                name: "😎 CHILLIN' 😎",
+                text: "Relaxed Mode Activated",
+                emoji: "🧘"
+            },
+            "default": {
+                name: "👤 READY PLAYER ONE 👤",
+                text: "Strike a pose!",
+                emoji: "✨"
+            }
+        };
+        
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            video = createCapture(VIDEO);
+            video.size(width, height);
+            video.hide();
+            
+            // Initialize PoseNet
+            poseNet = ml5.poseNet(video, modelReady);
+            poseNet.on('pose', gotPoses);
+        }
+        
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+        
+        function modelReady() {
+            console.log('PoseNet Model Loaded!');
+            document.getElementById('pose-info').querySelector('div').textContent = 'Ready! Strike a pose!';
+        }
+        
+        function gotPoses(results) {
+            poses = results;
+        }
+        
+        function draw() {
+            // Calculate video scaling to cover entire canvas
+            let videoAspect = video.width / video.height;
+            let canvasAspect = width / height;
+            let drawWidth, drawHeight, drawX, drawY;
+            
+            if (canvasAspect > videoAspect) {
+                // Canvas is wider than video
+                drawWidth = width;
+                drawHeight = width / videoAspect;
+                drawX = 0;
+                drawY = (height - drawHeight) / 2;
+            } else {
+                // Canvas is taller than video
+                drawHeight = height;
+                drawWidth = height * videoAspect;
+                drawX = (width - drawWidth) / 2;
+                drawY = 0;
+            }
+            
+            // Mirror the video
+            push();
+            translate(width, 0);
+            scale(-1, 1);
+            image(video, -drawX, drawY, drawWidth, drawHeight);
+            pop();
+            
+            // Draw pose and detect meme
+            if (poses.length > 0) {
+                let pose = poses[0].pose;
+                
+                // Detect current pose type
+                let newDetectedPose = detectPoseType(pose);
+                
+                // Check if pose changed
+                if (newDetectedPose !== detectedPose) {
+                    detectedPose = newDetectedPose;
+                    poseHoldTime = millis();
+                }
+                
+                // Check if pose has been held long enough
+                let currentTime = millis();
+                if (detectedPose !== confirmedMeme && 
+                    currentTime - poseHoldTime >= HOLD_DURATION &&
+                    currentTime - lastPoseChangeTime >= MIN_CHANGE_INTERVAL) {
+                    // Pose confirmed!
+                    confirmedMeme = detectedPose;
+                    lastPoseChangeTime = currentTime;
+                    onPoseConfirmed(confirmedMeme);
+                }
+                
+                currentMeme = confirmedMeme;
+                
+                // Draw skeleton
+                drawSkeleton(pose);
+                
+                // Draw keypoints
+                drawKeypoints(pose);
+                
+                // Display meme overlay
+                displayMeme(currentMeme);
+                
+                // Show hold progress if holding a new pose
+                if (detectedPose !== confirmedMeme) {
+                    let progress = (currentTime - poseHoldTime) / HOLD_DURATION;
+                    if (progress < 1) {
+                        drawHoldProgress(progress, detectedPose);
+                    }
+                }
+            } else {
+                currentMeme = confirmedMeme;
+                displayMeme(currentMeme);
+            }
+            
+            // Update info panel
+            updateInfoPanel(currentMeme);
+        }
+        
+        function onPoseConfirmed(poseName) {
+            console.log('Pose confirmed:', poseName);
+            
+            // Play boom sound
+            if (poseName !== 'default') {
+                boomSound.currentTime = 0;
+                boomSound.play().catch(e => console.log('Audio play failed:', e));
+            }
+            
+            // Display pose image
+            displayPoseImage(poseName);
+        }
+        
+        function displayPoseImage(poseName) {
+            if (poseName === 'default') {
+                poseImage.classList.remove('show');
+                return;
+            }
+            
+            // Get image path from meme definition
+            const meme = memes[poseName];
+            if (!meme || !meme.image) {
+                console.log('No image defined for pose:', poseName);
+                poseImage.classList.remove('show');
+                return;
+            }
+            
+            const imagePath = meme.image;
+            
+            // Test if image exists
+            const img = new Image();
+            img.onload = function() {
+                poseImage.src = imagePath;
+                poseImage.classList.add('show');
+                
+                // Hide after 3 seconds
+                setTimeout(() => {
+                    poseImage.classList.remove('show');
+                }, 3000);
+            };
+            img.onerror = function() {
+                console.log('Image not found:', imagePath);
+                poseImage.classList.remove('show');
+            };
+            img.src = imagePath;
+        }
+        
+        function drawHoldProgress(progress, poseName) {
+            // Draw progress bar
+            const barWidth = 200;
+            const barHeight = 20;
+            const x = width / 2 - barWidth / 2;
+            const y = 50;
+            
+            // Background
+            fill(0, 0, 0, 150);
+            noStroke();
+            rect(x - 10, y - 10, barWidth + 20, barHeight + 35, 10);
+            
+            // Text
+            fill(255);
+            textAlign(CENTER);
+            textSize(14);
+            text(`Hold pose...`, width / 2, y + 5);
+            
+            // Progress bar background
+            fill(50);
+            rect(x, y + 10, barWidth, barHeight, 5);
+            
+            // Progress bar fill
+            fill(102, 126, 234);
+            rect(x, y + 10, barWidth * progress, barHeight, 5);
+            
+            // Progress percentage
+            fill(255);
+            textSize(12);
+            text(Math.floor(progress * 100) + '%', width / 2, y + 25);
+        }
+        
+        function detectPoseType(pose) {
+            let leftShoulder = pose.leftShoulder;
+            let rightShoulder = pose.rightShoulder;
+            let leftElbow = pose.leftElbow;
+            let rightElbow = pose.rightElbow;
+            let leftWrist = pose.leftWrist;
+            let rightWrist = pose.rightWrist;
+            let leftHip = pose.leftHip;
+            let rightHip = pose.rightHip;
+            let nose = pose.nose;
+            let leftEye = pose.leftEye;
+            let rightEye = pose.rightEye;
+            let leftEar = pose.leftEar;
+            let rightEar = pose.rightEar;
+            let leftKnee = pose.leftKnee;
+            let rightKnee = pose.rightKnee;
+            let leftAnkle = pose.leftAnkle;
+            let rightAnkle = pose.rightAnkle;
+            
+            // Check custom poses first
+            for (let poseId in customPoseDetection) {
+                const customPose = customPoseDetection[poseId];
+                if (customPose.conditions) {
+                    try {
+                        // Evaluate the custom condition
+                        if (eval(customPose.conditions)) {
+                            return poseId;
+                        }
+                    } catch (error) {
+                        console.warn(`Error evaluating pose ${poseId}:`, error);
+                    }
+                }
+            }
+            
+            // Check if key points are detected
+            if (!leftShoulder || !rightShoulder || !leftWrist || !rightWrist) {
+                return "default";
+            }
+            
+            // ARMS UP (both wrists above shoulders)
+            if (leftWrist.y < leftShoulder.y - 50 && 
+                rightWrist.y < rightShoulder.y - 50) {
+                return "arms_up";
+            }
+            
+            // T-POSE (arms stretched out horizontally)
+            if (leftWrist.y > leftShoulder.y - 50 && 
+                leftWrist.y < leftShoulder.y + 50 &&
+                rightWrist.y > rightShoulder.y - 50 && 
+                rightWrist.y < rightShoulder.y + 50 &&
+                leftWrist.x < leftShoulder.x - 100 &&
+                rightWrist.x > rightShoulder.x + 100) {
+                return "t_pose";
+            }
+            
+            // DAB (one arm up, one arm across)
+            if ((leftWrist.y < leftShoulder.y && rightWrist.x < leftShoulder.x) ||
+                (rightWrist.y < rightShoulder.y && leftWrist.x > rightShoulder.x)) {
+                return "dab";
+            }
+            
+            // HANDS ON HIPS
+            if (leftHip && rightHip) {
+                let leftHandOnHip = dist(leftWrist.x, leftWrist.y, leftHip.x, leftHip.y) < 100;
+                let rightHandOnHip = dist(rightWrist.x, rightWrist.y, rightHip.x, rightHip.y) < 100;
+                
+                if (leftHandOnHip && rightHandOnHip) {
+                    return "hands_on_hips";
+                }
+            }
+            
+            // ARMS BEHIND HEAD (both wrists near head level, elbows out)
+            if (leftElbow && rightElbow && nose) {
+                if (leftWrist.y < nose.y && rightWrist.y < nose.y && 
+                    leftElbow.y < leftWrist.y && rightElbow.y < rightWrist.y &&
+                    Math.abs(leftWrist.x - nose.x) < 150 && Math.abs(rightWrist.x - nose.x) < 150) {
+                    return "arms_behind_head";
+                }
+            }
+            
+            return "default";
+        }
+        
+        function scalePositionToCanvas(x, y) {
+            // Scale pose coordinates from video resolution to canvas size
+            let videoAspect = video.width / video.height;
+            let canvasAspect = width / height;
+            let scaleX, scaleY, offsetX, offsetY;
+            
+            if (canvasAspect > videoAspect) {
+                scaleX = width / video.width;
+                scaleY = scaleX;
+                offsetX = 0;
+                offsetY = (height - video.height * scaleY) / 2;
+            } else {
+                scaleY = height / video.height;
+                scaleX = scaleY;
+                offsetX = (width - video.width * scaleX) / 2;
+                offsetY = 0;
+            }
+            
+            return {
+                x: x * scaleX + offsetX,
+                y: y * scaleY + offsetY
+            };
+        }
+        
+        function drawKeypoints(pose) {
+            for (let j = 0; j < pose.keypoints.length; j++) {
+                let keypoint = pose.keypoints[j];
+                if (keypoint.score > 0.2) {
+                    let pos = scalePositionToCanvas(keypoint.position.x, keypoint.position.y);
+                    fill(0, 255, 0, 150);
+                    noStroke();
+                    // Mirror the x coordinate
+                    ellipse(width - pos.x, pos.y, 8, 8);
+                }
+            }
+        }
+        
+        function drawSkeleton(pose) {
+            let skeleton = [
+                ["nose", "leftEye"],
+                ["leftEye", "leftEar"],
+                ["nose", "rightEye"],
+                ["rightEye", "rightEar"],
+                ["nose", "leftShoulder"],
+                ["nose", "rightShoulder"],
+                ["leftShoulder", "leftElbow"],
+                ["leftElbow", "leftWrist"],
+                ["rightShoulder", "rightElbow"],
+                ["rightElbow", "rightWrist"],
+                ["leftShoulder", "rightShoulder"],
+                ["leftShoulder", "leftHip"],
+                ["rightShoulder", "rightHip"],
+                ["leftHip", "rightHip"],
+                ["leftHip", "leftKnee"],
+                ["leftKnee", "leftAnkle"],
+                ["rightHip", "rightKnee"],
+                ["rightKnee", "rightAnkle"]
+            ];
+            
+            stroke(0, 255, 255, 120);
+            strokeWeight(2);
+            
+            for (let j = 0; j < skeleton.length; j++) {
+                let partA = pose[skeleton[j][0]];
+                let partB = pose[skeleton[j][1]];
+                
+                if (partA && partB) {
+                    let posA = scalePositionToCanvas(partA.x, partA.y);
+                    let posB = scalePositionToCanvas(partB.x, partB.y);
+                    // Mirror the x coordinates
+                    line(width - posA.x, posA.y, width - posB.x, posB.y);
+                }
+            }
+        }
+        
+        function displayMeme(memeType) {
+            let meme = memes[memeType];
+            
+            // Semi-transparent overlay
+            fill(0, 0, 0, 100);
+            noStroke();
+            rect(0, height - 120, width, 120);
+            
+            // Meme text
+            textAlign(CENTER);
+            textSize(32);
+            fill(255, 255, 255);
+            text(meme.emoji, width / 2, height - 80);
+            
+            textSize(20);
+            fill(255, 215, 0);
+            text(meme.text, width / 2, height - 40);
+            
+            // Add sparkle effect for special poses
+            if (memeType !== "default") {
+                drawSparkles();
+            }
+        }
+        
+        function drawSparkles() {
+            for (let i = 0; i < 3; i++) {
+                let x = random(width);
+                let y = random(height);
+                let size = random(20, 40);
+                
+                fill(255, 255, 255, random(100, 200));
+                noStroke();
+                textSize(size);
+                text("✨", x, y);
+            }
+        }
+        
+        function updateInfoPanel(memeType) {
+            let meme = memes[memeType];
+            document.getElementById('meme-name').textContent = meme.name;
+        }
+        
+        function loadPosesFromJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    // Load memes
+                    if (data.memes) {
+                        memes = { ...memes, ...data.memes };
+                    }
+                    
+                    // Load custom pose detection
+                    if (data.poseDetection) {
+                        customPoseDetection = data.poseDetection;
+                    }
+                    
+                    console.log('Loaded poses:', Object.keys(memes));
+                    alert(`Successfully loaded ${Object.keys(data.memes || {}).length} custom poses!`);
+                } catch (error) {
+                    alert('Error loading JSON file: ' + error.message);
+                    console.error(error);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+        
+        // Automatically load poses.json on page load
+        async function loadDefaultPoses() {
+            try {
+                const response = await fetch('poses.json');
+                if (!response.ok) {
+                    console.warn('poses.json not found, using built-in poses');
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                // Load memes
+                if (data.memes) {
+                    memes = { ...memes, ...data.memes };
+                }
+                
+                // Load custom pose detection
+                if (data.poseDetection) {
+                    customPoseDetection = data.poseDetection;
+                }
+                
+                console.log('Automatically loaded poses from poses.json:', Object.keys(data.memes || {}));
+            } catch (error) {
+                console.warn('Could not load poses.json:', error.message);
+            }
+        }
+        
+        // Load poses when page loads
+        loadDefaultPoses();
+    </script>
+</body>
+</html>
