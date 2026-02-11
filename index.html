@@ -293,10 +293,22 @@
                 opacity: 0.9;
             }
         }
+        
+        #cyborg-label {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            z-index: 1001;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
     <img id="pose-image" src="" alt="">
+    
+    <img id="cyborg-label" src="cyborg.svg" alt="Cyborg">
     
     <audio id="boom-sound" preload="auto">
         <source src="sounds/vine-boom.mp3" type="audio/mpeg">
