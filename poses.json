@@ -6,6 +6,18 @@
       "emoji": "🎊",
       "image": "poses/celebration.gif"
     },
+    "left_arm_up": {
+      "name": "👈 LEFT ARM UP! 👈",
+      "text": "Lefty Power!",
+      "emoji": "💪",
+      "image": "poses/dunk.gif"
+    },
+    "right_arm_up": {
+      "name": "👉 RIGHT ARM UP! 👉",
+      "text": "Righty Power!",
+      "emoji": "💪",
+      "image": "poses/butgodsaid.jpg"
+    },
     "t_pose": {
       "name": "💪 T-POSE DOMINANCE 💪",
       "text": "Assert Your Dominance",
@@ -57,6 +69,50 @@
         "leftElbow": { "x": 200, "y": 180, "color": "#ffd3b6" },
         "rightElbow": { "x": 400, "y": 180, "color": "#ffd3b6" },
         "leftWrist": { "x": 180, "y": 140, "color": "#ffaaa5" },
+        "rightWrist": { "x": 420, "y": 140, "color": "#ffaaa5" },
+        "leftHip": { "x": 270, "y": 380, "color": "#ff8b94" },
+        "rightHip": { "x": 330, "y": 380, "color": "#ff8b94" },
+        "leftKnee": { "x": 260, "y": 480, "color": "#c7ceea" },
+        "rightKnee": { "x": 340, "y": 480, "color": "#c7ceea" },
+        "leftAnkle": { "x": 250, "y": 560, "color": "#b4a7d6" },
+        "rightAnkle": { "x": 350, "y": 560, "color": "#b4a7d6" }
+      }
+    },
+    "left_arm_up": {
+      "conditions": "leftWrist && rightWrist && leftShoulder && rightShoulder && leftWrist.y < leftShoulder.y - 50 && rightWrist.y > rightShoulder.y - 20",
+      "keypoints": {
+        "nose": { "x": 300, "y": 150, "color": "#ff6b6b" },
+        "leftEye": { "x": 280, "y": 140, "color": "#4ecdc4" },
+        "rightEye": { "x": 320, "y": 140, "color": "#4ecdc4" },
+        "leftEar": { "x": 260, "y": 150, "color": "#ffe66d" },
+        "rightEar": { "x": 340, "y": 150, "color": "#ffe66d" },
+        "leftShoulder": { "x": 250, "y": 220, "color": "#a8e6cf" },
+        "rightShoulder": { "x": 350, "y": 220, "color": "#a8e6cf" },
+        "leftElbow": { "x": 200, "y": 180, "color": "#ffd3b6" },
+        "rightElbow": { "x": 380, "y": 280, "color": "#ffd3b6" },
+        "leftWrist": { "x": 180, "y": 140, "color": "#ffaaa5" },
+        "rightWrist": { "x": 400, "y": 320, "color": "#ffaaa5" },
+        "leftHip": { "x": 270, "y": 380, "color": "#ff8b94" },
+        "rightHip": { "x": 330, "y": 380, "color": "#ff8b94" },
+        "leftKnee": { "x": 260, "y": 480, "color": "#c7ceea" },
+        "rightKnee": { "x": 340, "y": 480, "color": "#c7ceea" },
+        "leftAnkle": { "x": 250, "y": 560, "color": "#b4a7d6" },
+        "rightAnkle": { "x": 350, "y": 560, "color": "#b4a7d6" }
+      }
+    },
+    "right_arm_up": {
+      "conditions": "leftWrist && rightWrist && leftShoulder && rightShoulder && rightWrist.y < rightShoulder.y - 50 && leftWrist.y > leftShoulder.y - 20",
+      "keypoints": {
+        "nose": { "x": 300, "y": 150, "color": "#ff6b6b" },
+        "leftEye": { "x": 280, "y": 140, "color": "#4ecdc4" },
+        "rightEye": { "x": 320, "y": 140, "color": "#4ecdc4" },
+        "leftEar": { "x": 260, "y": 150, "color": "#ffe66d" },
+        "rightEar": { "x": 340, "y": 150, "color": "#ffe66d" },
+        "leftShoulder": { "x": 250, "y": 220, "color": "#a8e6cf" },
+        "rightShoulder": { "x": 350, "y": 220, "color": "#a8e6cf" },
+        "leftElbow": { "x": 220, "y": 280, "color": "#ffd3b6" },
+        "rightElbow": { "x": 400, "y": 180, "color": "#ffd3b6" },
+        "leftWrist": { "x": 200, "y": 320, "color": "#ffaaa5" },
         "rightWrist": { "x": 420, "y": 140, "color": "#ffaaa5" },
         "leftHip": { "x": 270, "y": 380, "color": "#ff8b94" },
         "rightHip": { "x": 330, "y": 380, "color": "#ff8b94" },

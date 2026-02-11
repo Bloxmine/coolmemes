@@ -15,7 +15,9 @@
             align-items: center;
             min-height: 100vh;
             background-color: black;
-            font-family: 'Arial', sans-serif;
+            font-family: Impact, 'Arial Black', 'Helvetica Inserat', 'Bitstream Vera Sans Bold', 'Arial Bold', sans-serif;
+            color: white;
+            text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, -3px 0 0 #000, 3px 0 0 #000, 0 -3px 0 #000, 0 3px 0 #000;
         }
         
         #canvas-container {
@@ -28,18 +30,22 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(0, 0, 0, 0.7);
+            background: transparent;
             color: white;
             padding: 15px 25px;
             border-radius: 10px;
-            font-size: 18px;
+            font-size: 24px;
             z-index: 1000;
+            font-weight: bold;
+            text-transform: uppercase;
         }
         
         .meme-text {
             font-weight: bold;
-            color: #ffd700;
+            color: white;
             margin-top: 5px;
+            font-size: 28px;
+            text-transform: uppercase;
         }
         
         #controls {
@@ -89,12 +95,13 @@
             position: absolute;
             bottom: 20px;
             left: 20px;
-            background: rgba(0, 0, 0, 0.8);
+            background: transparent;
             color: white;
             padding: 15px 20px;
             border-radius: 10px;
             z-index: 1000;
-            font-size: 14px;
+            font-size: 18px;
+            font-weight: bold;
         }
         
         .score-item {
@@ -102,9 +109,9 @@
         }
         
         .score-value {
-            color: #ffd700;
+            color: white;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 22px;
         }
         
         #achievement-popup {
@@ -112,14 +119,16 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) scale(0);
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: transparent;
             color: white;
             padding: 30px;
             border-radius: 15px;
             z-index: 2000;
             text-align: center;
             transition: transform 0.3s ease;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            box-shadow: none;
+            font-size: 32px;
+            font-weight: bold;
         }
         
         #achievement-popup.show {
@@ -128,7 +137,9 @@
         
         #achievement-popup h2 {
             margin: 0 0 10px 0;
-            font-size: 32px;
+            font-size: 48px;
+            font-weight: bold;
+            text-transform: uppercase;
         }
         
         .modal {
@@ -163,6 +174,12 @@
             margin-bottom: 20px;
             border-bottom: 2px solid #667eea;
             padding-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        .modal-header h2 {
+            font-size: 36px;
+            text-transform: uppercase;
         }
         
         .modal-close {
@@ -235,11 +252,12 @@
         }
         
         .timer-display {
-            font-size: 48px;
+            font-size: 72px;
             font-weight: bold;
-            color: #ffd700;
+            color: white;
             text-align: center;
             margin: 20px 0;
+            text-transform: uppercase;
         }
         
         .btn-group {
@@ -692,11 +710,15 @@
             // Text
             fill(255);
             textAlign(CENTER);
-            textSize(14);
-            text(`Hold pose...`, width / 2, y + 5);
+            textFont('Impact');
+            stroke(0);
+            strokeWeight(2);
+            textSize(16);
+            text(`HOLD POSE...`, width / 2, y + 5);
             
             // Progress bar background
             fill(50);
+            noStroke();
             rect(x, y + 10, barWidth, barHeight, 5);
             
             // Progress bar fill
@@ -705,7 +727,9 @@
             
             // Progress percentage
             fill(255);
-            textSize(12);
+            stroke(0);
+            strokeWeight(2);
+            textSize(14);
             text(Math.floor(progress * 100) + '%', width / 2, y + 25);
         }
         
@@ -875,15 +899,23 @@
             noStroke();
             rect(0, height - 120, width, 120);
             
-            // Meme text
+            // Meme text with Impact font and black outline
             textAlign(CENTER);
+            textFont('Impact');
+            
+            // Emoji
             textSize(32);
             fill(255, 255, 255);
+            stroke(0);
+            strokeWeight(4);
             text(meme.emoji, width / 2, height - 80);
             
-            textSize(20);
-            fill(255, 215, 0);
-            text(meme.text, width / 2, height - 40);
+            // Text
+            textSize(24);
+            fill(255, 255, 255);
+            stroke(0);
+            strokeWeight(3);
+            text(meme.text.toUpperCase(), width / 2, height - 40);
             
             // Add sparkle effect for special poses
             if (memeType !== "default") {
