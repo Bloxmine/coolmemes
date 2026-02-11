@@ -5,10 +5,7 @@
       "text": "Achievement Unlocked!",
       "emoji": "🎊",
       "images": [
-        "poses/arms_up/celebration.gif",
-        "poses/arms_up/victory.gif",
-        "poses/arms_up/kino.png",
-        "poses/arms_up/beast.png"
+        "poses/arms_up/celebration.gif"
       ]
     },
     "left_arm_up": {
@@ -17,7 +14,7 @@
       "emoji": "💪",
       "images": [
         "poses/left_arm_up/dunk.gif",
-        "poses/left_arm_up/point.jpg"
+        "poses/left_arm_up/thinking.gif"
       ]
     },
     "right_arm_up": {
@@ -25,8 +22,7 @@
       "text": "Righty Power!",
       "emoji": "💪",
       "images": [
-        "poses/right_arm_up/butgodsaid.jpg",
-        "poses/right_arm_up/raise.gif"
+        "poses/right_arm_up/butgodsaid.jpg"
       ]
     },
     "t_pose": {
@@ -63,8 +59,33 @@
       "text": "Stay Cool!",
       "emoji": "😎",
       "images": [
-        "poses/peace_sign/peace_sign.gif",
-        "poses/peace_sign/peace.jpg"
+        "poses/peace_sign/peace.gif"
+      ]
+    },
+    "peace_sign_left": {
+      "name": "✌️ LEFT PEACE ✌️",
+      "text": "Lefty Peace!",
+      "emoji": "😎",
+      "images": [
+        "poses/peace_sign/peace-out.gif"
+      ]
+    },
+    "peace_sign_both": {
+      "name": "✌️✌️ DOUBLE PEACE ✌️✌️",
+      "text": "Maximum Peace Energy!",
+      "emoji": "🕊️",
+      "images": [
+        "poses/peace_sign/doublepeace.gif"
+      ]
+    },
+    "open_hands_both": {
+      "name": "🙌 HANDS UP 🙌",
+      "text": "Open Hand Energy!",
+      "emoji": "👐",
+      "images": [
+        "poses/arms_up/armsup2.gif",
+        "poses/arms_up/beast.png",
+        "poses/arms_up/kino.png"
       ]
     },
     "wave": {

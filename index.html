@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meme Magic Mirror</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
-    <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+    <script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>
     <style>
         body {
             margin: 0;
@@ -417,8 +417,10 @@
     
     <script>
         let video;
-        let poseNet;
+        let bodyPose;
+        let handPose;
         let poses = [];
+        let hands = [];
         let currentMeme = "default";
         let confirmedMeme = "default"; // The pose that's actually registered
         let customPoseDetection = {}; // Store custom pose detection logic
@@ -478,6 +480,12 @@
         const boomSound = document.getElementById('boom-sound');
         const poseImage = document.getElementById('pose-image');
         
+        // Preload models
+        function preload() {
+            bodyPose = ml5.bodyPose();
+            handPose = ml5.handPose();
+        }
+        
         // Meme images - using emoji-based memes for simplicity
         let memes = {
             "arms_up": {
@@ -505,6 +513,26 @@
                 text: "Relaxed Mode Activated",
                 emoji: "🧘"
             },
+            "peace_sign": {
+                name: "✌️ PEACE OUT ✌️",
+                text: "Stay Cool!",
+                emoji: "😎"
+            },
+            "peace_sign_left": {
+                name: "✌️ LEFT PEACE ✌️",
+                text: "Lefty Peace!",
+                emoji: "😎"
+            },
+            "peace_sign_both": {
+                name: "✌️✌️ DOUBLE PEACE ✌️✌️",
+                text: "Maximum Peace Energy!",
+                emoji: "🕊️"
+            },
+            "open_hands_both": {
+                name: "🙌 HANDS UP 🙌",
+                text: "Open Hand Energy!",
+                emoji: "👐"
+            },
             "default": {
                 name: "",
                 text: "Strike a pose!",
@@ -518,22 +546,138 @@
             video.size(width, height);
             video.hide();
             
-            // Initialize PoseNet
-            poseNet = ml5.poseNet(video, modelReady);
-            poseNet.on('pose', gotPoses);
+            // Start detecting body poses
+            bodyPose.detectStart(video, gotPoses);
+            
+            // Start detecting hands
+            handPose.detectStart(video, gotHands);
+            
+            console.log('Models loaded and detection started!');
+            document.getElementById('pose-info').querySelector('div').textContent = 'Ready! Strike a pose!';
         }
         
         function windowResized() {
             resizeCanvas(windowWidth, windowHeight);
         }
         
-        function modelReady() {
-            console.log('PoseNet Model Loaded!');
-            document.getElementById('pose-info').querySelector('div').textContent = 'Ready! Strike a pose!';
-        }
-        
         function gotPoses(results) {
             poses = results;
+        }
+        
+        function gotHands(results) {
+            hands = results;
+        }
+        
+        // Helper function to get keypoint by name from ml5@1 BodyPose
+        function getKeypoint(pose, name) {
+            if (!pose || !pose.keypoints) return null;
+            const keypoint = pose.keypoints.find(kp => kp.name === name);
+            return keypoint && keypoint.confidence > 0.1 ? keypoint : null;
+        }
+        
+        // Detect peace sign from hand keypoints
+        function detectPeaceSign() {
+            if (hands.length === 0) return null;
+            
+            let rightPeace = false;
+            let leftPeace = false;
+            
+            for (let i = 0; i < hands.length; i++) {
+                let hand = hands[i];
+                // Check handedness
+                let handedness = hand.handedness || hand.label || '';
+                if (typeof handedness === 'object') {
+                    handedness = handedness.displayName || handedness.categoryName || '';
+                }
+                let isRight = typeof handedness === 'string' && handedness.toLowerCase().includes('right');
+                let isLeft = typeof handedness === 'string' && handedness.toLowerCase().includes('left');
+                
+                let keypoints = hand.keypoints;
+                if (!keypoints || keypoints.length < 21) continue;
+                
+                // Get finger tips and base knuckles
+                let indexTip = keypoints[8];  // index finger tip
+                let indexPip = keypoints[6];  // index finger middle joint
+                let middleTip = keypoints[12]; // middle finger tip
+                let middlePip = keypoints[10]; // middle finger middle joint
+                let ringTip = keypoints[16];   // ring finger tip
+                let ringPip = keypoints[14];   // ring finger middle joint
+                let pinkyTip = keypoints[20];  // pinky tip
+                let pinkyPip = keypoints[18];  // pinky middle joint
+                let wrist = keypoints[0];      // wrist
+                
+                // Check if index and middle fingers are extended (tip is farther from wrist than middle joint)
+                let indexExtended = Math.abs(indexTip.y - wrist.y) > Math.abs(indexPip.y - wrist.y) + 20;
+                let middleExtended = Math.abs(middleTip.y - wrist.y) > Math.abs(middlePip.y - wrist.y) + 20;
+                
+                // Check if ring and pinky are folded (tip is closer to wrist than middle joint)
+                let ringFolded = Math.abs(ringTip.y - wrist.y) < Math.abs(ringPip.y - wrist.y) + 10;
+                let pinkyFolded = Math.abs(pinkyTip.y - wrist.y) < Math.abs(pinkyPip.y - wrist.y) + 10;
+                
+                // Peace sign detected: index and middle extended, ring and pinky folded
+                if (indexExtended && middleExtended && ringFolded && pinkyFolded) {
+                    if (isRight) rightPeace = true;
+                    if (isLeft) leftPeace = true;
+                }
+            }
+            
+            // Return in priority order: both hands, then right, then left
+            if (rightPeace && leftPeace) return 'peace_sign_both';
+            if (rightPeace) return 'peace_sign';
+            if (leftPeace) return 'peace_sign_left';
+            return null;
+        }
+        
+        // Detect open hands (all fingers extended)
+        function detectOpenHands() {
+            if (hands.length < 2) return null; // Need both hands
+            
+            let rightOpen = false;
+            let leftOpen = false;
+            
+            for (let i = 0; i < hands.length; i++) {
+                let hand = hands[i];
+                // Check handedness
+                let handedness = hand.handedness || hand.label || '';
+                if (typeof handedness === 'object') {
+                    handedness = handedness.displayName || handedness.categoryName || '';
+                }
+                let isRight = typeof handedness === 'string' && handedness.toLowerCase().includes('right');
+                let isLeft = typeof handedness === 'string' && handedness.toLowerCase().includes('left');
+                
+                let keypoints = hand.keypoints;
+                if (!keypoints || keypoints.length < 21) continue;
+                
+                // Get finger tips and middle joints
+                let thumbTip = keypoints[4];
+                let thumbMcp = keypoints[2];
+                let indexTip = keypoints[8];
+                let indexPip = keypoints[6];
+                let middleTip = keypoints[12];
+                let middlePip = keypoints[10];
+                let ringTip = keypoints[16];
+                let ringPip = keypoints[14];
+                let pinkyTip = keypoints[20];
+                let pinkyPip = keypoints[18];
+                let wrist = keypoints[0];
+                
+                // Check if all fingers are extended
+                let thumbExtended = Math.abs(thumbTip.x - wrist.x) > Math.abs(thumbMcp.x - wrist.x) + 15;
+                let indexExtended = Math.abs(indexTip.y - wrist.y) > Math.abs(indexPip.y - wrist.y) + 20;
+                let middleExtended = Math.abs(middleTip.y - wrist.y) > Math.abs(middlePip.y - wrist.y) + 20;
+                let ringExtended = Math.abs(ringTip.y - wrist.y) > Math.abs(ringPip.y - wrist.y) + 20;
+                let pinkyExtended = Math.abs(pinkyTip.y - wrist.y) > Math.abs(pinkyPip.y - wrist.y) + 20;
+                
+                // Open hand: all fingers extended
+                if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+                    if (isRight) rightOpen = true;
+                    if (isLeft) leftOpen = true;
+                }
+            }
+            
+            // Only return if both hands are open
+            if (rightOpen && leftOpen) return 'open_hands_both';
+            return null;
         }
         
         function draw() {
@@ -565,10 +709,13 @@
             
             // Draw pose and detect meme
             if (poses.length > 0) {
-                let pose = poses[0].pose;
+                let pose = poses[0];
+                
+                // Check for hand gestures first (higher priority)
+                let handGesture = detectOpenHands() || detectPeaceSign();
                 
                 // Detect current pose type
-                let newDetectedPose = detectPoseType(pose);
+                let newDetectedPose = handGesture || detectPoseType(pose, handGesture !== null);
                 
                 // Check if pose changed
                 if (newDetectedPose !== detectedPose) {
@@ -608,6 +755,11 @@
             } else {
                 currentMeme = confirmedMeme;
                 displayMeme(currentMeme);
+            }
+            
+            // Draw hand keypoints
+            if (hands.length > 0) {
+                drawHandKeypoints(hands);
             }
             
             // Update info panel
@@ -748,24 +900,25 @@
             text(Math.floor(progress * 100) + '%', width / 2, y + 25);
         }
         
-        function detectPoseType(pose) {
-            let leftShoulder = pose.leftShoulder;
-            let rightShoulder = pose.rightShoulder;
-            let leftElbow = pose.leftElbow;
-            let rightElbow = pose.rightElbow;
-            let leftWrist = pose.leftWrist;
-            let rightWrist = pose.rightWrist;
-            let leftHip = pose.leftHip;
-            let rightHip = pose.rightHip;
-            let nose = pose.nose;
-            let leftEye = pose.leftEye;
-            let rightEye = pose.rightEye;
-            let leftEar = pose.leftEar;
-            let rightEar = pose.rightEar;
-            let leftKnee = pose.leftKnee;
-            let rightKnee = pose.rightKnee;
-            let leftAnkle = pose.leftAnkle;
-            let rightAnkle = pose.rightAnkle;
+        function detectPoseType(pose, hasHandGesture = false) {
+            // Get keypoints using helper function for ml5@1 BodyPose
+            let leftShoulder = getKeypoint(pose, 'left_shoulder');
+            let rightShoulder = getKeypoint(pose, 'right_shoulder');
+            let leftElbow = getKeypoint(pose, 'left_elbow');
+            let rightElbow = getKeypoint(pose, 'right_elbow');
+            let leftWrist = getKeypoint(pose, 'left_wrist');
+            let rightWrist = getKeypoint(pose, 'right_wrist');
+            let leftHip = getKeypoint(pose, 'left_hip');
+            let rightHip = getKeypoint(pose, 'right_hip');
+            let nose = getKeypoint(pose, 'nose');
+            let leftEye = getKeypoint(pose, 'left_eye');
+            let rightEye = getKeypoint(pose, 'right_eye');
+            let leftEar = getKeypoint(pose, 'left_ear');
+            let rightEar = getKeypoint(pose, 'right_ear');
+            let leftKnee = getKeypoint(pose, 'left_knee');
+            let rightKnee = getKeypoint(pose, 'right_knee');
+            let leftAnkle = getKeypoint(pose, 'left_ankle');
+            let rightAnkle = getKeypoint(pose, 'right_ankle');
             
             // Check custom poses first
             for (let poseId in customPoseDetection) {
@@ -784,6 +937,11 @@
             
             // Check if key points are detected
             if (!leftShoulder || !rightShoulder || !leftWrist || !rightWrist) {
+                return "default";
+            }
+            
+            // Skip arm detection if hand gesture is being shown
+            if (hasHandGesture) {
                 return "default";
             }
             
@@ -858,8 +1016,8 @@
         function drawKeypoints(pose) {
             for (let j = 0; j < pose.keypoints.length; j++) {
                 let keypoint = pose.keypoints[j];
-                if (keypoint.score > 0.2) {
-                    let pos = scalePositionToCanvas(keypoint.position.x, keypoint.position.y);
+                if (keypoint.confidence > 0.2) {
+                    let pos = scalePositionToCanvas(keypoint.x, keypoint.y);
                     fill(0, 255, 0, 150);
                     noStroke();
                     // Mirror the x coordinate
@@ -870,36 +1028,71 @@
         
         function drawSkeleton(pose) {
             let skeleton = [
-                ["nose", "leftEye"],
-                ["leftEye", "leftEar"],
-                ["nose", "rightEye"],
-                ["rightEye", "rightEar"],
-                ["nose", "leftShoulder"],
-                ["nose", "rightShoulder"],
-                ["leftShoulder", "leftElbow"],
-                ["leftElbow", "leftWrist"],
-                ["rightShoulder", "rightElbow"],
-                ["rightElbow", "rightWrist"],
-                ["leftShoulder", "rightShoulder"],
-                ["leftShoulder", "leftHip"],
-                ["rightShoulder", "rightHip"],
-                ["leftHip", "rightHip"],
-                ["leftHip", "leftKnee"],
-                ["leftKnee", "leftAnkle"],
-                ["rightHip", "rightKnee"],
-                ["rightKnee", "rightAnkle"]
+                ["nose", "left_eye"],
+                ["left_eye", "left_ear"],
+                ["nose", "right_eye"],
+                ["right_eye", "right_ear"],
+                ["nose", "left_shoulder"],
+                ["nose", "right_shoulder"],
+                ["left_shoulder", "left_elbow"],
+                ["left_elbow", "left_wrist"],
+                ["right_shoulder", "right_elbow"],
+                ["right_elbow", "right_wrist"],
+                ["left_shoulder", "right_shoulder"],
+                ["left_shoulder", "left_hip"],
+                ["right_shoulder", "right_hip"],
+                ["left_hip", "right_hip"],
+                ["left_hip", "left_knee"],
+                ["left_knee", "left_ankle"],
+                ["right_hip", "right_knee"],
+                ["right_knee", "right_ankle"]
             ];
             
             stroke(0, 255, 255, 120);
             strokeWeight(2);
             
             for (let j = 0; j < skeleton.length; j++) {
-                let partA = pose[skeleton[j][0]];
-                let partB = pose[skeleton[j][1]];
+                let partA = getKeypoint(pose, skeleton[j][0]);
+                let partB = getKeypoint(pose, skeleton[j][1]);
                 
                 if (partA && partB) {
                     let posA = scalePositionToCanvas(partA.x, partA.y);
                     let posB = scalePositionToCanvas(partB.x, partB.y);
+                    // Mirror the x coordinates
+                    line(width - posA.x, posA.y, width - posB.x, posB.y);
+                }
+            }
+        }
+        
+        function drawHandKeypoints(hands) {
+            // Draw keypoints for each detected hand
+            for (let i = 0; i < hands.length; i++) {
+                let hand = hands[i];
+                
+                // Draw hand keypoints
+                for (let j = 0; j < hand.keypoints.length; j++) {
+                    let keypoint = hand.keypoints[j];
+                    let pos = scalePositionToCanvas(keypoint.x, keypoint.y);
+                    
+                    // Draw green circles for hand keypoints
+                    fill(0, 255, 0, 200);
+                    noStroke();
+                    ellipse(width - pos.x, pos.y, 6, 6);
+                }
+                
+                // Draw hand skeletal connections
+                let connections = handPose.getConnections();
+                stroke(0, 255, 0, 150);
+                strokeWeight(2);
+                
+                for (let j = 0; j < connections.length; j++) {
+                    let [indexA, indexB] = connections[j];
+                    let keypointA = hand.keypoints[indexA];
+                    let keypointB = hand.keypoints[indexB];
+                    
+                    let posA = scalePositionToCanvas(keypointA.x, keypointA.y);
+                    let posB = scalePositionToCanvas(keypointB.x, keypointB.y);
+                    
                     // Mirror the x coordinates
                     line(width - posA.x, posA.y, width - posB.x, posB.y);
                 }
