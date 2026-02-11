@@ -1,18 +1,51 @@
 Place your pose images here!
 
-Format: .jpg or .gif files
+Format: .jpg, .gif, or .png files
 
-Examples:
-- dab.gif (animated GIFs work!)
-- t_pose.jpg (static images)
-- arms_up.gif
-- hands_on_hips.jpg
-- peace_sign.gif
+FOLDER STRUCTURE (for variations):
+Create a folder for each pose type and put multiple images inside:
 
-These images will display on screen when the corresponding pose is detected and held.
-Both .jpg and .gif formats are supported!
+poses/
+  arms_up/
+    celebration.gif
+    victory.gif
+    hooray.jpg
+  t_pose/
+    t_pose.jpg
+    dominance.gif
+    power.png
+  dab/
+    dab.gif
+    epic_dab.jpg
+  left_arm_up/
+    dunk.gif
+    point.jpg
+  right_arm_up/
+    butgodsaid.jpg
+    raise.gif
+  hands_on_hips/
+    sassy.gif
+    confident.jpg
+  peace_sign/
+    peace_sign.gif
+    peace.jpg
+  wave/
+    wave.jpg
+    hello.gif
+    kenobi.jpg
+  arms_behind_head/
+    arms.gif
+    chillin.jpg
+    relax.png
 
-Image paths are defined in the poses.json file under each meme's "image" property.
+HOW IT WORKS:
+- Each pose randomly selects from its folder of images
+- List all image variations in poses.json under the "images" array
+- The app will randomly pick one each time the pose is detected
+- Mix GIFs, JPGs, and PNGs for variety!
+
+BACKWARD COMPATIBILITY:
+You can still use single images with the "image" property instead of "images" array
 
 You can use:
 - Meme images

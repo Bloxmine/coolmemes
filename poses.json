@@ -4,55 +4,88 @@
       "name": "🎉 CELEBRATION TIME! 🎉",
       "text": "Achievement Unlocked!",
       "emoji": "🎊",
-      "image": "poses/celebration.gif"
+      "images": [
+        "poses/arms_up/celebration.gif",
+        "poses/arms_up/victory.gif",
+        "poses/arms_up/kin.png",
+        "poses/arms_up/beast.png"
+      ]
     },
     "left_arm_up": {
       "name": "👈 LEFT ARM UP! 👈",
       "text": "Lefty Power!",
       "emoji": "💪",
-      "image": "poses/dunk.gif"
+      "images": [
+        "poses/left_arm_up/dunk.gif",
+        "poses/left_arm_up/point.jpg"
+      ]
     },
     "right_arm_up": {
       "name": "👉 RIGHT ARM UP! 👉",
       "text": "Righty Power!",
       "emoji": "💪",
-      "image": "poses/butgodsaid.jpg"
+      "images": [
+        "poses/right_arm_up/butgodsaid.jpg",
+        "poses/right_arm_up/raise.gif"
+      ]
     },
     "t_pose": {
       "name": "💪 T-POSE DOMINANCE 💪",
       "text": "Assert Your Dominance",
       "emoji": "😎",
-      "image": "poses/t_pose.jpg"
+      "images": [
+        "poses/t_pose/t_pose.jpg",
+        "poses/t_pose/dominance.gif",
+        "poses/t_pose/power.png"
+      ]
     },
     "dab": {
       "name": "👋 DAB ON 'EM 👋",
       "text": "Epic Dab Detected",
       "emoji": "🔥",
-      "image": "poses/dab.gif"
+      "images": [
+        "poses/dab/dab.gif",
+        "poses/dab/epic_dab.jpg",
+        "poses/dab/dab_on_em.png"
+      ]
     },
     "hands_on_hips": {
       "name": "💁 SASSY MODE 💁",
       "text": "Confidence Level: Maximum",
       "emoji": "💅",
-      "image": "poses/sassy.gif"
+      "images": [
+        "poses/hands_on_hips/sassy.gif",
+        "poses/hands_on_hips/confident.jpg"
+      ]
     },
     "peace_sign": {
       "name": "✌️ PEACE OUT ✌️",
       "text": "Stay Cool!",
       "emoji": "😎",
-      "image": "poses/peace_sign.gif"
+      "images": [
+        "poses/peace_sign/peace_sign.gif",
+        "poses/peace_sign/peace.jpg"
+      ]
     },
     "wave": {
       "name": "👋 HELLO THERE 👋",
       "text": "General Kenobi!",
       "emoji": "🖐️",
-      "image": "poses/wave.jpg"
+      "images": [
+        "poses/wave/wave.jpg",
+        "poses/wave/hello.gif",
+        "poses/wave/kenobi.jpg"
+      ]
     },
     "arms_behind_head": {
       "name": "😎 CHILLIN' 😎",
       "text": "Relaxed Mode Activated",
       "emoji": "🧘",
-      "image": "poses/arms.gif"
+      "images": [
+        "poses/arms_behind_head/arms.gif",
+        "poses/arms_behind_head/chillin.jpg",
+        "poses/arms_behind_head/relax.png"
+      ]
     }
   },
   "poseDetection": {

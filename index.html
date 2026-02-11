@@ -669,13 +669,28 @@
             
             // Get image path from meme definition
             const meme = memes[poseName];
-            if (!meme || !meme.image) {
-                console.log('No image defined for pose:', poseName);
+            if (!meme) {
+                console.log('No meme defined for pose:', poseName);
                 poseImage.classList.remove('show');
                 return;
             }
             
-            const imagePath = meme.image;
+            // Support both images array (new) and image string (legacy)
+            let imagePath;
+            if (meme.images && Array.isArray(meme.images) && meme.images.length > 0) {
+                // Randomly select from images array
+                const randomIndex = Math.floor(Math.random() * meme.images.length);
+                imagePath = meme.images[randomIndex];
+                console.log(`Randomly selected image ${randomIndex + 1}/${meme.images.length} for ${poseName}:`, imagePath);
+            } else if (meme.image) {
+                // Fallback to single image
+                imagePath = meme.image;
+                console.log('Using single image for', poseName, ':', imagePath);
+            } else {
+                console.log('No image defined for pose:', poseName);
+                poseImage.classList.remove('show');
+                return;
+            }
             
             // Test if image exists
             const img = new Image();
