@@ -2,6 +2,8 @@
 
 A pose-recognition powered magic mirror that displays memes based on your body poses! Built with p5.js and ML5.js.
 
+**✨ NEW:** Now with gamification features including scoring, leaderboards, achievements, challenges, timer mode, automatic screenshots, video recording, and photo gallery! See [GAMIFICATION_GUIDE.md](GAMIFICATION_GUIDE.md) for full details.
+
 ## Files & Folders
 
 - **index.html** - Main magic mirror application
@@ -9,6 +11,7 @@ A pose-recognition powered magic mirror that displays memes based on your body p
 - **poses.json** - Pose definitions file (auto-loads on startup)
 - **sounds/** - Place vine-boom.mp3 here for sound effects
 - **poses/** - Place pose images here (e.g., dab.jpg, t_pose.jpg)
+- **GAMIFICATION_GUIDE.md** - Complete guide to scoring, achievements, and capture features
 
 ## Setup
 
@@ -31,10 +34,24 @@ A pose-recognition powered magic mirror that displays memes based on your body p
 - **Sound effects** - Plays vine-boom.mp3 when pose is detected
 - **Full-screen images** - Displays the corresponding .jpg from poses/ folder
 - **Progress bar** - Shows how long you need to hold the pose
+- **🎮 Scoring system** - Earn points and build combos
+- **🏆 Leaderboard** - Track your high scores
+- **🎖️ Achievements** - Unlock 8 different achievements
+- **🎯 Challenges** - Complete daily and timer challenges
+- **📸 Auto-screenshots** - Every pose is captured automatically
+- **🎥 Video recording** - Record your pose sessions
+- **🖼️ Photo gallery** - Browse and download all captured moments
 
 **Controls:**
 - **Load Poses** - Import a custom poses.json file
 - **Pose Editor** - Open the pose editor in a new tab
+- **🏆 Leaderboard** - View high scores
+- **🎖️ Achievements** - View unlocked achievements
+- **📸 Gallery** - Browse captured photos
+- **🎯 Challenges** - View daily challenges & timer mode
+- **⏱️ Timer Mode** - Speed challenge (10 poses as fast as possible)
+- **📷 Screenshot** - Manual screenshot capture
+- **🎥 Record** - Start/stop video recording
 
 ### 2. Creating Custom Poses
 
