@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Tracking Juggling</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 3000;
+            backdrop-filter: blur(10px);
+        }
+        
+        #loading.hidden {
+            display: none;
+        }
+        
+        #loading h2 {
+            margin-top: 0;
+            color: #ffd700;
+        }
+        
+        .stat {
+            margin: 8px 0;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            color: #ffd700;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+        
+        .btn {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 2px solid white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+        
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.9);
+            color: black;
+            transform: scale(1.05);
+        }
+        
+        #instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 2000;
+            backdrop-filter: blur(10px);
+            max-width: 500px;
+        }
+        
+        #instructions h2 {
+            margin-top: 0;
+            color: #ffd700;
+            font-size: 32px;
+        }
+        
+        #instructions ul {
+            text-align: left;
+            padding-left: 20px;
+            line-height: 1.8;
+        }
+        
+        #instructions.hidden {
+            display: none;
+        }
+        
+        .hand-trail {
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div id="loading">
+        <h2>🎥 Loading Camera...</h2>
+        <p>Please allow camera access to start juggling!</p>
+    </div>
+    
+    <div id="info-panel">
+        <div class="stat"><span class="stat-label">Balls:</span> <span id="ball-count">0</span></div>
+        <div class="stat"><span class="stat-label">Catches:</span> <span id="catch-count">0</span></div>
+        <div class="stat"><span class="stat-label">Throws:</span> <span id="throw-count">0</span></div>
+        <div class="stat"><span class="stat-label">Current Streak:</span> <span id="streak">0</span></div>
+        <div class="stat"><span class="stat-label">Best Streak:</span> <span id="best-streak">0</span></div>
+    </div>
+    
+    <div id="controls">
+        <button class="btn" onclick="addBall()">Add Ball</button>
+        <button class="btn" onclick="removeBall()">Remove Ball</button>
+        <button class="btn" onclick="resetBalls()">Reset</button>
+        <button class="btn" onclick="toggleInstructions()">Help</button>
+    </div>
+    
+    <div id="instructions">
+        <h2>🤹 Juggling Instructions 🤹</h2>
+        <ul>
+            <li><strong>Show your hands</strong> to the camera</li>
+            <li><strong>Move your hand near a ball</strong> to catch it</li>
+            <li><strong>Move your hand quickly upward</strong> to throw</li>
+            <li>The faster you move, the higher it goes!</li>
+            <li>Try to keep all balls in the air</li>
+            <li>Build up your catch streak!</li>
+        </ul>
+        <button class="btn" onclick="toggleInstructions()">Got it!</button>
+    </div>
+    
+    <script>
+        let video;
+        let handPose;
+        let hands = [];
+        let balls = [];
+        let catches = 0;
+        let throws = 0;
+        let currentStreak = 0;
+        let bestStreak = 0;
+        
+        // Physics constants
+        const GRAVITY = 0.6;
+        const BALL_RADIUS = 30;
+        const CATCH_DISTANCE = 80;
+        const MIN_THROW_VELOCITY = 8;
+        const VELOCITY_MULTIPLIER = 0.8;
+        const GROUND_BOUNCE = 0.6;
+        const WALL_BOUNCE = 0.8;
+        
+        // Hand tracking
+        let handHistory = {
+            left: [],
+            right: []
+        };
+        const HISTORY_LENGTH = 5;
+        
+        class Ball {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = random(-3, 3);
+                this.vy = random(-5, -10);
+                this.radius = BALL_RADIUS;
+                this.color = color(random(100, 255), random(100, 255), random(100, 255));
+                this.held = false;
+                this.heldBy = null;
+                this.rotation = 0;
+                this.rotationSpeed = random(-0.2, 0.2);
+                this.trail = [];
+            }
+            
+            update() {
+                if (this.held) {
+                    // Ball is held by a hand
+                    if (this.heldBy) {
+                        this.x = this.heldBy.x;
+                        this.y = this.heldBy.y;
+                        this.vx = 0;
+                        this.vy = 0;
+                    }
+                } else {
+                    // Apply physics
+                    this.vy += GRAVITY;
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.rotation += this.rotationSpeed;
+                    
+                    // Add to trail
+                    this.trail.push({x: this.x, y: this.y});
+                    if (this.trail.length > 10) {
+                        this.trail.shift();
+                    }
+                    
+                    // Ground collision
+                    if (this.y + this.radius > height) {
+                        this.y = height - this.radius;
+                        this.vy *= -GROUND_BOUNCE;
+                        this.vx *= 0.95;
+                        
+                        // Reset streak if ball hit ground
+                        if (abs(this.vy) > 2) {
+                            currentStreak = 0;
+                            updateStats();
+                        }
+                    }
+                    
+                    // Wall collisions
+                    if (this.x - this.radius < 0) {
+                        this.x = this.radius;
+                        this.vx *= -WALL_BOUNCE;
+                    }
+                    if (this.x + this.radius > width) {
+                        this.x = width - this.radius;
+                        this.vx *= -WALL_BOUNCE;
+                    }
+                    
+                    // Top collision
+                    if (this.y - this.radius < 0) {
+                        this.y = this.radius;
+                        this.vy *= -WALL_BOUNCE;
+                    }
+                }
+            }
+            
+            display() {
+                // Draw trail
+                if (this.trail.length > 1) {
+                    noFill();
+                    strokeWeight(3);
+                    for (let i = 0; i < this.trail.length - 1; i++) {
+                        let alpha = map(i, 0, this.trail.length, 0, 100);
+                        stroke(red(this.color), green(this.color), blue(this.color), alpha);
+                        line(this.trail[i].x, this.trail[i].y, 
+                             this.trail[i + 1].x, this.trail[i + 1].y);
+                    }
+                }
+                
+                // Draw ball
+                push();
+                translate(this.x, this.y);
+                rotate(this.rotation);
+                
+                // Ball shadow
+                fill(0, 0, 0, 50);
+                noStroke();
+                ellipse(5, 5, this.radius * 2);
+                
+                // Ball body
+                fill(this.color);
+                stroke(255);
+                strokeWeight(this.held ? 4 : 2);
+                ellipse(0, 0, this.radius * 2);
+                
+                // Ball shine
+                fill(255, 255, 255, 150);
+                noStroke();
+                ellipse(-this.radius * 0.3, -this.radius * 0.3, this.radius * 0.6);
+                
+                // Ball pattern
+                stroke(0, 0, 0, 50);
+                strokeWeight(2);
+                noFill();
+                arc(0, 0, this.radius * 1.5, this.radius * 1.5, 0, PI);
+                
+                pop();
+            }
+            
+            checkCatch(hand, handedness) {
+                if (this.held) return false;
+                
+                let d = dist(this.x, this.y, hand.x, hand.y);
+                if (d < CATCH_DISTANCE) {
+                    this.held = true;
+                    this.heldBy = hand;
+                    this.trail = [];
+                    catches++;
+                    currentStreak++;
+                    if (currentStreak > bestStreak) {
+                        bestStreak = currentStreak;
+                    }
+                    updateStats();
+                    return true;
+                }
+                return false;
+            }
+            
+            release(velocity) {
+                if (!this.held) return;
+                
+                this.held = false;
+                this.heldBy = null;
+                
+                // Apply velocity from hand movement
+                if (velocity && (abs(velocity.x) > 2 || abs(velocity.y) > 2)) {
+                    this.vx = velocity.x * VELOCITY_MULTIPLIER;
+                    this.vy = velocity.y * VELOCITY_MULTIPLIER;
+                    throws++;
+                    updateStats();
+                }
+            }
+        }
+        
+        function preload() {
+            handPose = ml5.handPose();
+        }
+        
+        function setup() {
+            let canvas = createCanvas(windowWidth, windowHeight);
+            canvas.parent('canvas-container');
+            
+            video = createCapture(VIDEO);
+            video.size(width, height);
+            video.hide();
+            
+            // Wait for video to load
+            video.elt.addEventListener('loadeddata', () => {
+                console.log('Camera ready!');
+                document.getElementById('loading').classList.add('hidden');
+            });
+            
+            handPose.detectStart(video, gotHands);
+            
+            // Start with 2 balls
+            addBall();
+            addBall();
+            
+            updateStats();
+        }
+        
+        function gotHands(results) {
+            hands = results;
+        }
+        
+        function draw() {
+            // Clear background
+            background(220);
+            
+            // Draw video feed (mirrored)
+            push();
+            translate(width, 0);
+            scale(-1, 1);
+            image(video, 0, 0, width, height);
+            pop();
+            
+            // Update and draw balls
+            for (let ball of balls) {
+                ball.update();
+            }
+            
+            // Process hands
+            if (hands.length > 0) {
+                for (let hand of hands) {
+                    let handedness = getHandedness(hand);
+                    let wrist = hand.keypoints[0]; // Wrist position
+                    
+                    if (!wrist) continue;
+                    
+                    let handPos = {
+                        x: wrist.x,
+                        y: wrist.y
+                    };
+                    
+                    // Update hand history
+                    if (!handHistory[handedness]) {
+                        handHistory[handedness] = [];
+                    }
+                    handHistory[handedness].push(handPos);
+                    if (handHistory[handedness].length > HISTORY_LENGTH) {
+                        handHistory[handedness].shift();
+                    }
+                    
+                    // Calculate hand velocity
+                    let velocity = {x: 0, y: 0};
+                    if (handHistory[handedness].length >= 2) {
+                        let prev = handHistory[handedness][handHistory[handedness].length - 2];
+                        velocity.x = handPos.x - prev.x;
+                        velocity.y = handPos.y - prev.y;
+                    }
+                    
+                    // Check for catches
+                    for (let ball of balls) {
+                        ball.checkCatch(handPos, handedness);
+                    }
+                    
+                    // Check for throws (upward movement with held ball)
+                    let heldBalls = balls.filter(b => b.held && b.heldBy === handPos);
+                    if (heldBalls.length > 0 && velocity.y < -MIN_THROW_VELOCITY) {
+                        for (let ball of heldBalls) {
+                            ball.release(velocity);
+                        }
+                    }
+                    
+                    // Draw hand visualization
+                    drawHand(hand, handPos, velocity);
+                }
+            }
+            
+            // Draw balls after hands (so they appear on top)
+            for (let ball of balls) {
+                ball.display();
+            }
+        }
+        
+        function drawHand(hand, handPos, velocity) {
+            // Draw hand skeleton
+            strokeWeight(2);
+            stroke(255, 255, 0, 150);
+            
+            // Draw connections
+            const connections = [
+                [0, 1], [1, 2], [2, 3], [3, 4],      // Thumb
+                [0, 5], [5, 6], [6, 7], [7, 8],      // Index
+                [0, 9], [9, 10], [10, 11], [11, 12], // Middle
+                [0, 13], [13, 14], [14, 15], [15, 16], // Ring
+                [0, 17], [17, 18], [18, 19], [19, 20]  // Pinky
+            ];
+            
+            for (let [start, end] of connections) {
+                let kp1 = hand.keypoints[start];
+                let kp2 = hand.keypoints[end];
+                if (kp1 && kp2) {
+                    line(kp1.x, kp1.y, kp2.x, kp2.y);
+                }
+            }
+            
+            // Draw keypoints
+            fill(255, 255, 0);
+            noStroke();
+            for (let keypoint of hand.keypoints) {
+                ellipse(keypoint.x, keypoint.y, 8, 8);
+            }
+            
+            // Draw hand center marker
+            fill(255, 0, 0);
+            stroke(255);
+            strokeWeight(2);
+            ellipse(handPos.x, handPos.y, 20, 20);
+            
+            // Draw velocity indicator
+            if (abs(velocity.y) > MIN_THROW_VELOCITY) {
+                stroke(0, 255, 0);
+                strokeWeight(4);
+                line(handPos.x, handPos.y, 
+                     handPos.x + velocity.x * 3, 
+                     handPos.y + velocity.y * 3);
+            }
+        }
+        
+        function getHandedness(hand) {
+            let handedness = hand.handedness || hand.label || 'unknown';
+            if (typeof handedness === 'object') {
+                handedness = handedness.displayName || handedness.categoryName || 'unknown';
+            }
+            if (typeof handedness === 'string') {
+                if (handedness.toLowerCase().includes('right')) return 'right';
+                if (handedness.toLowerCase().includes('left')) return 'left';
+            }
+            return 'unknown';
+        }
+        
+        function addBall() {
+            let x = width / 2 + random(-100, 100);
+            let y = height / 3;
+            balls.push(new Ball(x, y));
+            updateStats();
+        }
+        
+        function removeBall() {
+            if (balls.length > 0) {
+                balls.pop();
+                updateStats();
+            }
+        }
+        
+        function resetBalls() {
+            balls = [];
+            catches = 0;
+            throws = 0;
+            currentStreak = 0;
+            updateStats();
+        }
+        
+        function updateStats() {
+            document.getElementById('ball-count').textContent = balls.length;
+            document.getElementById('catch-count').textContent = catches;
+            document.getElementById('throw-count').textContent = throws;
+            document.getElementById('streak').textContent = currentStreak;
+            document.getElementById('best-streak').textContent = bestStreak;
+        }
+        
+        function toggleInstructions() {
+            document.getElementById('instructions').classList.toggle('hidden');
+        }
+        
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+        
+        // Hide instructions after 5 seconds
+        setTimeout(() => {
+            document.getElementById('instructions').classList.add('hidden');
+        }, 5000);
+    </script>
+</body>
+</html>

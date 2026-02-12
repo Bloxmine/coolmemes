@@ -40,9 +40,7 @@
       "text": "Epic Dab Detected",
       "emoji": "🔥",
       "images": [
-        "poses/dab/dab.gif",
-        "poses/dab/epic_dab.jpg",
-        "poses/dab/dab_on_em.png"
+        "poses/dab/dab.gif"
       ]
     },
     "hands_on_hips": {
@@ -50,8 +48,7 @@
       "text": "Confidence Level: Maximum",
       "emoji": "💅",
       "images": [
-        "poses/hands_on_hips/sassy.gif",
-        "poses/hands_on_hips/confident.jpg"
+        "poses/hands_on_hips/sassy.gif"
       ]
     },
     "peace_sign": {
@@ -86,6 +83,22 @@
         "poses/arms_up/armsup2.gif",
         "poses/arms_up/beast.png",
         "poses/arms_up/kino.png"
+      ]
+    },
+    "open_hand_right": {
+      "name": "👋 RIGHT HAND WAVE 👋",
+      "text": "Right Hand Open!",
+      "emoji": "🖐️",
+      "images": [
+        "poses/hand/stop.gif"
+      ]
+    },
+    "open_hand_left": {
+      "name": "👋 LEFT HAND WAVE 👋",
+      "text": "Left Hand Open!",
+      "emoji": "🖐️",
+      "images": [
+        "poses/hand/talktothehand.gif"
       ]
     },
     "wave": {

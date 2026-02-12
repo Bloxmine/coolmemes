@@ -6,25 +6,29 @@ A pose-recognition powered magic mirror that displays memes based on your body p
 
 ## Files & Folders
 
-- **index.html** - Main magic mirror application
+- **index.html** - Landing page / Title screen
+- **mirror.html** - Main magic mirror application
+- **juggle.html** - 🤹 Hand tracking juggling game with physics
 - **pose-editor.html** - Visual pose editor to create custom poses
 - **poses.json** - Pose definitions file (auto-loads on startup)
-- **sounds/** - Place vine-boom.mp3 here for sound effects
+- **sounds/** - Place vine-boom.mp3 and tada.mp3 here for sound effects
 - **poses/** - Place pose images here (e.g., dab.jpg, t_pose.jpg)
 - **GAMIFICATION_GUIDE.md** - Complete guide to scoring, achievements, and capture features
 
 ## Setup
 
-1. Place `vine-boom.mp3` in the `sounds/` folder
+1. Place `vine-boom.mp3` and `tada.mp3` in the `sounds/` folder
 2. Add pose images to the `poses/` folder (format: `[pose_id].jpg`)
-3. Open `index.html` in your browser
+3. Open `index.html` in your browser to see the landing page
+4. Click "START" to launch the mirror application
 
 ## How to Use
 
 ### 1. Running the Magic Mirror
 
-1. Open `index.html` in your web browser
-2. Allow camera access when prompted
+1. Open `index.html` in your web browser to see the welcome screen
+2. Click the "START" button to launch the mirror
+3. Allow camera access when prompted
 3. **Hold a pose for 1.5 seconds** to register it
 4. Watch for the progress bar to fill up
 5. Hear the vine boom and see your meme image!
@@ -53,7 +57,33 @@ A pose-recognition powered magic mirror that displays memes based on your body p
 - **📷 Screenshot** - Manual screenshot capture
 - **🎥 Record** - Start/stop video recording
 
-### 2. Creating Custom Poses
+### 2. Juggling with Hand Tracking 🤹
+
+Open `juggle.html` in your browser for an interactive juggling experience!
+
+**How to Play:**
+- Show your hands to the camera
+- Move your hand near a ball to catch it (within the yellow hand circle)
+- Move your hand quickly upward to throw the ball
+- The faster you move your hand, the higher the ball goes!
+- Try to keep all balls in the air and build up your catch streak
+- Balls that hit the ground will reset your streak
+
+**Controls:**
+- **Add Ball** - Add a new ball to juggle (more challenge!)
+- **Remove Ball** - Remove a ball
+- **Reset** - Clear all balls and reset stats
+- **Help** - Show instructions again
+
+**Features:**
+- Real-time hand tracking with visual skeleton
+- Realistic physics (gravity, velocity, bouncing)
+- Velocity-based throwing (faster hand movement = higher throw)
+- Catch tracking and streak counter
+- Colorful balls with trails and shine effects
+- Statistics for catches, throws, and best streak
+
+### 3. Creating Custom Poses
 
 1. Open `pose-editor.html` in your browser
 2. **Use the toolbar to select your tool:**
@@ -84,7 +114,7 @@ A pose-recognition powered magic mirror that displays memes based on your body p
 - **Escape** - Deselect all points
 - **Delete** - Reset selected points to default positions
 
-### 3. Detection Conditions
+### 4. Detection Conditions
 
 Write JavaScript expressions using these keypoint variables:
 - `nose`, `leftEye`, `rightEye`, `leftEar`, `rightEar`
@@ -110,7 +140,7 @@ leftWrist.y > leftShoulder.y - 50 && leftWrist.y < leftShoulder.y + 50 && rightW
 Math.sqrt((leftWrist.x - leftHip.x) ** 2 + (leftWrist.y - leftHip.y) ** 2) < 100 && Math.sqrt((rightWrist.x - rightHip.x) ** 2 + (rightWrist.y - rightHip.y) ** 2) < 100
 ```
 
-### 4. Default Poses
+### 5. Default Poses
 
 The app comes with these default poses:
 - 🎉 **Arms Up** - Celebration
