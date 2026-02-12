@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meme Magic Mirror</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>
+    <link rel="stylesheet" href="css/main.css">
+    <script src="js/mirror.js" defer></script>
+</head>
+<body>
+    <img id="pose-image" src="" alt="">
+    
+    <img id="cyborg-label" src="cyborg.svg" alt="Cyborg">
+    
+    <audio id="boom-sound" preload="auto">
+        <source src="sounds/vine-boom.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="tada-sound" preload="auto">
+        <source src="sounds/tada.mp3" type="audio/mpeg">
+    </audio>
+    <div id="pose-info">
+        <div>Initializing camera...</div>
+        <div class="meme-text" id="meme-name"></div>
+    </div>
+    
+    <div id="controls">
+        <button class="control-btn" onclick="openHelp()" title="Help - Available Poses">❓</button>
+        <button class="control-btn" onclick="document.getElementById('json-file-input').click()" title="Load Poses">📂</button>
+        <button class="control-btn" onclick="window.open('pose-editor.html', '_blank')" title="Pose Editor">🎭</button>
+        <button class="control-btn" onclick="openLeaderboard()" title="Leaderboard">🏆</button>
+        <button class="control-btn" onclick="openAchievements()" title="Achievements">🎖️</button>
+        <button class="control-btn" onclick="openGallery()" title="Gallery">📸</button>
+        <button class="control-btn" onclick="openChallenges()" title="Challenges">🎯</button>
+        <button class="control-btn" onclick="toggleTimerMode()" title="Timer Mode">⏱️</button>
+        <button class="control-btn" onclick="takeScreenshot()" title="Screenshot">📷</button>
+        <button class="control-btn" onclick="toggleRecording()" title="Record">🎥</button>
+        <input type="file" id="json-file-input" accept=".json" onchange="loadPosesFromJSON(event)">
+    </div>
+    
+    <div id="score-panel">
+        <div class="score-item">Score: <span class="score-value" id="score">0</span></div>
+        <div class="score-item">Combo: <span class="score-value" id="combo">0</span>x</div>
+        <div class="score-item">Poses: <span class="score-value" id="pose-count">0</span></div>
+    </div>
+    
+    <div id="achievement-popup">
+        <h2>🎖️ Achievement Unlocked!</h2>
+        <p id="achievement-text"></p>
+    </div>
+    
+    <div id="challenge-popup">
+        <h2>🎯 Challenge Complete!</h2>
+        <p id="challenge-text"></p>
+    </div>
+    
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🏆 Leaderboard</h2>
+                <span class="modal-close" onclick="closeModal('leaderboard-modal')">&times;</span>
+            </div>
+            <div id="leaderboard-list"></div>
+        </div>
+    </div>
+    
+    <!-- Achievements Modal -->
+    <div id="achievements-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎖️ Achievements</h2>
+                <span class="modal-close" onclick="closeModal('achievements-modal')">&times;</span>
+            </div>
+            <div id="achievements-list"></div>
+        </div>
+    </div>
+    
+    <!-- Gallery Modal -->
+    <div id="gallery-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📸 Photo Gallery</h2>
+                <span class="modal-close" onclick="closeModal('gallery-modal')">&times;</span>
+            </div>
+            <div class="btn-group">
+                <button class="control-btn menu-btn" onclick="clearGallery()">🗑️ Clear All</button>
+                <button class="control-btn menu-btn" onclick="downloadAllPhotos()">💾 Download All</button>
+            </div>
+            <div class="gallery-grid" id="gallery-grid"></div>
+        </div>
+    </div>
+    
+    <!-- Challenges Modal -->
+    <div id="challenges-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎯 Challenges</h2>
+                <span class="modal-close" onclick="closeModal('challenges-modal')">&times;</span>
+            </div>
+            <div id="timer-mode-section" style="display:none;">
+                <h3>⏱️ Timer Challenge Active!</h3>
+                <div class="timer-display" id="timer-display">0:00</div>
+                <p>Hit <span id="timer-target">10</span> different poses as fast as possible!</p>
+                <p>Poses remaining: <span class="score-value" id="timer-remaining">10</span></p>
+                <button class="control-btn" onclick="stopTimerMode()">Stop Timer</button>
+            </div>
+            <div id="challenges-list"></div>
+        </div>
+    </div>
+    
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>❓ Available Poses</h2>
+                <span class="modal-close" onclick="closeModal('help-modal')">&times;</span>
+            </div>
+            <p style="text-align:center; margin: 20px 0; color: #aaa;">Hold each pose for 1.5 seconds to trigger it!</p>
+            <div id="help-pose-list"></div>
+        </div>
+    </div>
+</body>
+</html>

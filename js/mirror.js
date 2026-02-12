@@ -1,0 +1,1214 @@
+// Author: Hein Dijstelbloem, Claude
+// Date: 2026-02-12
+// Description: Main JavaScript file for the Meme Magic Mirror app. Handles video capture, pose detection, meme display, gamification, and user interactions.
+let video;
+let bodyPose;
+let handPose;
+let poses = [];
+let hands = [];
+let currentMeme = "default";
+let confirmedMeme = "default";
+let customPoseDetection = {};
+let gameScore = 0;
+let comboMultiplier = 1;
+let poseCounter = 0;
+let lastPoseType = null;
+let uniquePosesHit = new Set();
+let sessionStartTime = Date.now();
+
+// timer mode, remove this, doesn't work!!
+let timerMode = false;
+let timerStartTime = null;
+let timerPosesRemaining = 10;
+let timerInterval = null;
+
+// recording
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+
+// Gallery
+let photoGallery = JSON.parse(localStorage.getItem('photoGallery') || '[]');
+
+// Achievements
+let achievements = [
+    { id: 'first_pose', name: 'First Steps', desc: 'Hit your first pose', unlocked: false, check: () => poseCounter >= 1 },
+    { id: 'pose_master', name: 'Pose Master', desc: 'Hit 50 poses', unlocked: false, check: () => poseCounter >= 50 },
+    { id: 'combo_king', name: 'Combo King', desc: 'Reach 5x combo', unlocked: false, check: () => comboMultiplier >= 5 },
+    { id: 'variety_show', name: 'Variety Show', desc: 'Hit 5 different poses', unlocked: false, check: () => uniquePosesHit.size >= 5 },
+    { id: 'speedster', name: 'Speedster', desc: 'Complete timer challenge under 30 seconds', unlocked: false, check: () => false },
+    { id: 'photographer', name: 'Photographer', desc: 'Take 10 screenshots', unlocked: false, check: () => photoGallery.length >= 10 },
+    { id: 'century_club', name: 'Century Club', desc: 'Score 100 points', unlocked: false, check: () => gameScore >= 100 },
+    { id: 'marathon', name: 'Marathon Runner', desc: 'Play for 10 minutes', unlocked: false, check: () => (Date.now() - sessionStartTime) >= 600000 }
+];
+
+// achievements are stored in localStorage, load them on startup
+let savedAchievements = JSON.parse(localStorage.getItem('achievements') || '[]');
+savedAchievements.forEach(savedId => {
+    let ach = achievements.find(a => a.id === savedId);
+    if (ach) ach.unlocked = true;
+});
+
+// leaderboard
+let leaderboard = JSON.parse(localStorage.getItem('leaderboard') || '[]');
+
+// pose holding mechanism
+let detectedPose = "default";
+let poseHoldTime = 0;
+let lastPoseChangeTime = 0;
+const HOLD_DURATION = 1500; // 1.5 seconds in milliseconds
+const MIN_CHANGE_INTERVAL = 2000; // Minimum 2 seconds between pose changes
+
+// Sound
+const boomSound = document.getElementById('boom-sound');
+const tadaSound = document.getElementById('tada-sound');
+const poseImage = document.getElementById('pose-image');
+
+// Preload models
+function preload() {
+    bodyPose = ml5.bodyPose();
+    handPose = ml5.handPose();
+}
+
+// backup meme images - using emoji-based memes for simplicity
+let memes = {
+    "arms_up": {
+        name: "🎉 CELEBRATION TIME! 🎉",
+        text: "Achievement Unlocked!",
+        emoji: "🎊"
+    },
+    "t_pose": {  // 
+        name: "💪 T-POSE DOMINANCE 💪",
+        text: "Assert Your Dominance",
+        emoji: "😎"
+    },
+    "dab": {
+        name: "👋 DAB ON 'EM 👋",
+        text: "Epic Dab Detected",
+        emoji: "🔥"
+    },
+    "hands_on_hips": {
+        name: "💁 SASSY MODE 💁",
+        text: "Confidence Level: Maximum",
+        emoji: "💅"
+    },
+    "arms_behind_head": {
+        name: "😎 CHILLIN' 😎",
+        text: "Relaxed Mode Activated",
+        emoji: "🧘"
+    },
+    "peace_sign": {
+        name: "✌️ PEACE OUT ✌️",
+        text: "Stay Cool!",
+        emoji: "😎"
+    },
+    "peace_sign_left": {
+        name: "✌️ LEFT PEACE ✌️",
+        text: "Lefty Peace!",
+        emoji: "😎"
+    },
+    "peace_sign_both": {
+        name: "✌️✌️ DOUBLE PEACE ✌️✌️",
+        text: "Maximum Peace Energy!",
+        emoji: "🕊️"
+    },
+    "open_hands_both": {
+        name: "🙌 HANDS UP 🙌",
+        text: "Open Hand Energy!",
+        emoji: "👐"
+    },
+    "open_hand_right": {
+        name: "👋 RIGHT HAND WAVE 👋",
+        text: "Right Hand Open!",
+        emoji: "🖐️"
+    },
+    "open_hand_left": {
+        name: "👋 LEFT HAND WAVE 👋",
+        text: "Left Hand Open!",
+        emoji: "🖐️"
+    },
+    "default": {
+        name: "",
+        text: "Strike a pose!",
+        emoji: ""
+    }
+};
+
+function setup() {
+    createCanvas(windowWidth, windowHeight);
+    video = createCapture(VIDEO);
+    video.size(width, height);
+    video.hide();
+    
+    // Start detecting body poses
+    bodyPose.detectStart(video, gotPoses);
+    
+    // Start detecting hands
+    handPose.detectStart(video, gotHands);
+    
+    console.log('Models loaded and detection started!');
+    document.getElementById('pose-info').querySelector('div').textContent = 'Ready! Strike a pose!';
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
+
+function gotPoses(results) {
+    poses = results;
+}
+
+function gotHands(results) {
+    hands = results;
+}
+
+// Helper function to get keypoint by name from ml5@1 BodyPose
+function getKeypoint(pose, name) {
+    if (!pose || !pose.keypoints) return null;
+    const keypoint = pose.keypoints.find(kp => kp.name === name);
+    return keypoint && keypoint.confidence > 0.1 ? keypoint : null;
+}
+
+// Detect peace sign from hand keypoints
+function detectPeaceSign() {
+    if (hands.length === 0) return null;
+    
+    let rightPeace = false;
+    let leftPeace = false;
+    
+    for (let i = 0; i < hands.length; i++) {
+        let hand = hands[i];
+        // Check handedness
+        let handedness = hand.handedness || hand.label || '';
+        if (typeof handedness === 'object') {
+            handedness = handedness.displayName || handedness.categoryName || '';
+        }
+        let isRight = typeof handedness === 'string' && handedness.toLowerCase().includes('right');
+        let isLeft = typeof handedness === 'string' && handedness.toLowerCase().includes('left');
+        
+        let keypoints = hand.keypoints;
+        if (!keypoints || keypoints.length < 21) continue;
+        
+        // Get finger tips and base knuckles
+        let indexTip = keypoints[8];  // index finger tip
+        let indexPip = keypoints[6];  // index finger middle joint
+        let middleTip = keypoints[12]; // middle finger tip
+        let middlePip = keypoints[10]; // middle finger middle joint
+        let ringTip = keypoints[16];   // ring finger tip
+        let ringPip = keypoints[14];   // ring finger middle joint
+        let pinkyTip = keypoints[20];  // pinky tip
+        let pinkyPip = keypoints[18];  // pinky middle joint
+        let wrist = keypoints[0];      // wrist
+        
+        // Check if index and middle fingers are extended (tip is farther from wrist than middle joint)
+        let indexExtended = Math.abs(indexTip.y - wrist.y) > Math.abs(indexPip.y - wrist.y) + 20;
+        let middleExtended = Math.abs(middleTip.y - wrist.y) > Math.abs(middlePip.y - wrist.y) + 20;
+        
+        // Check if ring and pinky are folded (tip is closer to wrist than middle joint)
+        let ringFolded = Math.abs(ringTip.y - wrist.y) < Math.abs(ringPip.y - wrist.y) + 10;
+        let pinkyFolded = Math.abs(pinkyTip.y - wrist.y) < Math.abs(pinkyPip.y - wrist.y) + 10;
+        
+        // Peace sign detected: index and middle extended, ring and pinky folded
+        if (indexExtended && middleExtended && ringFolded && pinkyFolded) {
+            if (isRight) rightPeace = true;
+            if (isLeft) leftPeace = true;
+        }
+    }
+    
+    // Return in priority order: both hands, then right, then left
+    if (rightPeace && leftPeace) return 'peace_sign_both';
+    if (rightPeace) return 'peace_sign';
+    if (leftPeace) return 'peace_sign_left';
+    return null;
+}
+
+// Detect open hands (all fingers extended)
+function detectOpenHands() {
+    if (hands.length === 0) return null;
+    
+    let rightOpen = false;
+    let leftOpen = false;
+    
+    for (let i = 0; i < hands.length; i++) {
+        let hand = hands[i];
+        // Check handedness
+        let handedness = hand.handedness || hand.label || '';
+        if (typeof handedness === 'object') {
+            handedness = handedness.displayName || handedness.categoryName || '';
+        }
+        let isRight = typeof handedness === 'string' && handedness.toLowerCase().includes('right');
+        let isLeft = typeof handedness === 'string' && handedness.toLowerCase().includes('left');
+        
+        let keypoints = hand.keypoints;
+        if (!keypoints || keypoints.length < 21) continue;
+        
+        // Get finger tips and middle joints
+        let thumbTip = keypoints[4];
+        let thumbMcp = keypoints[2];
+        let indexTip = keypoints[8];
+        let indexPip = keypoints[6];
+        let middleTip = keypoints[12];
+        let middlePip = keypoints[10];
+        let ringTip = keypoints[16];
+        let ringPip = keypoints[14];
+        let pinkyTip = keypoints[20];
+        let pinkyPip = keypoints[18];
+        let wrist = keypoints[0];
+        
+        // Check if all fingers are extended
+        let thumbExtended = Math.abs(thumbTip.x - wrist.x) > Math.abs(thumbMcp.x - wrist.x) + 15;
+        let indexExtended = Math.abs(indexTip.y - wrist.y) > Math.abs(indexPip.y - wrist.y) + 20;
+        let middleExtended = Math.abs(middleTip.y - wrist.y) > Math.abs(middlePip.y - wrist.y) + 20;
+        let ringExtended = Math.abs(ringTip.y - wrist.y) > Math.abs(ringPip.y - wrist.y) + 20;
+        let pinkyExtended = Math.abs(pinkyTip.y - wrist.y) > Math.abs(pinkyPip.y - wrist.y) + 20;
+        
+        // Open hand: all fingers extended
+        if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+            if (isRight) rightOpen = true;
+            if (isLeft) leftOpen = true;
+        }
+    }
+    
+    // Return in priority order: both hands, then right, then left
+    if (rightOpen && leftOpen) return 'open_hands_both';
+    if (rightOpen) return 'open_hand_right';
+    if (leftOpen) return 'open_hand_left';
+    return null;
+}
+
+function draw() {
+    // Calculate video scaling to cover entire canvas
+    let videoAspect = video.width / video.height;
+    let canvasAspect = width / height;
+    let drawWidth, drawHeight, drawX, drawY;
+    
+    if (canvasAspect > videoAspect) {
+        // Canvas is wider than video
+        drawWidth = width;
+        drawHeight = width / videoAspect;
+        drawX = 0;
+        drawY = (height - drawHeight) / 2;
+    } else {
+        // Canvas is taller than video
+        drawHeight = height;
+        drawWidth = height * videoAspect;
+        drawX = (width - drawWidth) / 2;
+        drawY = 0;
+    }
+    
+    // Mirror the video
+    push();
+    translate(width, 0);
+    scale(-1, 1);
+    image(video, -drawX, drawY, drawWidth, drawHeight);
+    pop();
+    
+    // Draw pose and detect meme
+    if (poses.length > 0) {
+        let pose = poses[0];
+        
+        // Check for hand gestures first (higher priority)
+        let handGesture = detectOpenHands() || detectPeaceSign();
+        
+        // Detect current pose type
+        let newDetectedPose = handGesture || detectPoseType(pose, handGesture !== null);
+        
+        // Check if pose changed
+        if (newDetectedPose !== detectedPose) {
+            detectedPose = newDetectedPose;
+            poseHoldTime = millis();
+        }
+        
+        // Check if pose has been held long enough
+        let currentTime = millis();
+        if (detectedPose !== confirmedMeme && 
+            currentTime - poseHoldTime >= HOLD_DURATION &&
+            currentTime - lastPoseChangeTime >= MIN_CHANGE_INTERVAL) {
+            // Pose confirmed!
+            confirmedMeme = detectedPose;
+            lastPoseChangeTime = currentTime;
+            onPoseConfirmed(confirmedMeme);
+        }
+        
+        currentMeme = confirmedMeme;
+        
+        // Draw skeleton
+        drawSkeleton(pose);
+        
+        // Draw keypoints
+        drawKeypoints(pose);
+        
+        // Display meme overlay
+        displayMeme(currentMeme);
+        
+        // Show hold progress if holding a new pose
+        if (detectedPose !== confirmedMeme) {
+            let progress = (currentTime - poseHoldTime) / HOLD_DURATION;
+            if (progress < 1) {
+                drawHoldProgress(progress, detectedPose);
+            }
+        }
+    } else {
+        currentMeme = confirmedMeme;
+        displayMeme(currentMeme);
+    }
+    
+    // Draw hand keypoints
+    if (hands.length > 0) {
+        drawHandKeypoints(hands);
+    }
+    
+    // Update info panel
+    updateInfoPanel(currentMeme);
+}
+
+function onPoseConfirmed(poseName) {
+    console.log('Pose confirmed:', poseName);
+    
+    // Play boom sound
+    if (poseName !== 'default') {
+        boomSound.currentTime = 0;
+        boomSound.play().catch(e => console.log('Audio play failed:', e));
+    }
+    
+    // Display pose image
+    displayPoseImage(poseName);
+    
+    // Gamification: award points
+    if (poseName !== 'default') {
+        // Update combo
+        if (poseName === lastPoseType) {
+            comboMultiplier = Math.min(comboMultiplier + 1, 10); // Max 10x combo
+        } else {
+            comboMultiplier = 1;
+        }
+        
+        // Award points (base 10 * combo multiplier)
+        let pointsEarned = 10 * comboMultiplier;
+        gameScore += pointsEarned;
+        
+        // Track unique poses
+        uniquePosesHit.add(poseName);
+        poseCounter++;
+        
+        // Update display
+        updateScoreDisplay();
+        
+        // Check achievements
+        checkAchievements();
+        
+        // Timer mode
+        if (timerMode) {
+            updateTimerMode(poseName);
+        }
+        
+        // Auto screenshot
+        takeScreenshot(true); // Pass true for auto-capture
+        
+        lastPoseType = poseName;
+    }
+}
+
+function displayPoseImage(poseName) {
+    if (poseName === 'default') {
+        poseImage.classList.remove('show');
+        return;
+    }
+    
+    // Get image path from meme definition
+    const meme = memes[poseName];
+    if (!meme) {
+        console.log('No meme defined for pose:', poseName);
+        poseImage.classList.remove('show');
+        return;
+    }
+    
+    // Support both images array (new) and image string (legacy)
+    let imagePath;
+    if (meme.images && Array.isArray(meme.images) && meme.images.length > 0) {
+        // Randomly select from images array
+        const randomIndex = Math.floor(Math.random() * meme.images.length);
+        imagePath = meme.images[randomIndex];
+        console.log(`Randomly selected image ${randomIndex + 1}/${meme.images.length} for ${poseName}:`, imagePath);
+    } else if (meme.image) {
+        // Fallback to single image
+        imagePath = meme.image;
+        console.log('Using single image for', poseName, ':', imagePath);
+    } else {
+        console.log('No image defined for pose:', poseName);
+        poseImage.classList.remove('show');
+        return;
+    }
+    
+    // Test if image exists
+    const img = new Image();
+    img.onload = function() {
+        poseImage.src = imagePath;
+        poseImage.classList.add('show');
+        
+        // Hide after 3 seconds
+        setTimeout(() => {
+            poseImage.classList.remove('show');
+        }, 3000);
+    };
+    img.onerror = function() {
+        console.log('Image not found:', imagePath);
+        poseImage.classList.remove('show');
+    };
+    img.src = imagePath;
+}
+
+function drawHoldProgress(progress, poseName) {
+    // Draw progress bar
+    const barWidth = 200;
+    const barHeight = 20;
+    const x = width - barWidth - 30; // Top right position
+    const y = 20;
+    
+    // Background
+    fill(0, 0, 0, 150);
+    noStroke();
+    rect(x - 10, y - 10, barWidth + 20, barHeight + 35, 10);
+    
+    // Text
+    fill(255);
+    textAlign(CENTER);
+    textFont('Impact');
+    stroke(0);
+    strokeWeight(2);
+    textSize(16);
+    text(`HOLD POSE...`, x + barWidth / 2, y + 5);
+    
+    // Progress bar background
+    fill(50);
+    noStroke();
+    rect(x, y + 10, barWidth, barHeight, 5);
+    
+    // Progress bar fill
+    fill(102, 126, 234);
+    rect(x, y + 10, barWidth * progress, barHeight, 5);
+    
+    // Progress percentage
+    fill(255);
+    stroke(0);
+    strokeWeight(2);
+    textSize(14);
+    text(Math.floor(progress * 100) + '%', x + barWidth / 2, y + 25);
+}
+
+function detectPoseType(pose, hasHandGesture = false) {
+    // Get keypoints using helper function for ml5@1 BodyPose
+    let leftShoulder = getKeypoint(pose, 'left_shoulder');
+    let rightShoulder = getKeypoint(pose, 'right_shoulder');
+    let leftElbow = getKeypoint(pose, 'left_elbow');
+    let rightElbow = getKeypoint(pose, 'right_elbow');
+    let leftWrist = getKeypoint(pose, 'left_wrist');
+    let rightWrist = getKeypoint(pose, 'right_wrist');
+    let leftHip = getKeypoint(pose, 'left_hip');
+    let rightHip = getKeypoint(pose, 'right_hip');
+    let nose = getKeypoint(pose, 'nose');
+    let leftEye = getKeypoint(pose, 'left_eye');
+    let rightEye = getKeypoint(pose, 'right_eye');
+    let leftEar = getKeypoint(pose, 'left_ear');
+    let rightEar = getKeypoint(pose, 'right_ear');
+    let leftKnee = getKeypoint(pose, 'left_knee');
+    let rightKnee = getKeypoint(pose, 'right_knee');
+    let leftAnkle = getKeypoint(pose, 'left_ankle');
+    let rightAnkle = getKeypoint(pose, 'right_ankle');
+    
+    // Check custom poses first
+    for (let poseId in customPoseDetection) {
+        const customPose = customPoseDetection[poseId];
+        if (customPose.conditions) {
+            try {
+                // Evaluate the custom condition
+                if (eval(customPose.conditions)) {
+                    return poseId;
+                }
+            } catch (error) {
+                console.warn(`Error evaluating pose ${poseId}:`, error);
+            }
+        }
+    }
+    
+    // Check if key points are detected
+    if (!leftShoulder || !rightShoulder || !leftWrist || !rightWrist) {
+        return "default";
+    }
+    
+    // Skip arm detection if hand gesture is being shown
+    if (hasHandGesture) {
+        return "default";
+    }
+    
+    // ARMS UP (both wrists above shoulders)
+    if (leftWrist.y < leftShoulder.y - 50 && 
+        rightWrist.y < rightShoulder.y - 50) {
+        return "arms_up";
+    }
+    
+    // T-POSE (arms stretched out horizontally)
+    if (leftWrist.y > leftShoulder.y - 50 && 
+        leftWrist.y < leftShoulder.y + 50 &&
+        rightWrist.y > rightShoulder.y - 50 && 
+        rightWrist.y < rightShoulder.y + 50 &&
+        leftWrist.x < leftShoulder.x - 100 &&
+        rightWrist.x > rightShoulder.x + 100) {
+        return "t_pose";
+    }
+    
+    // DAB (one arm up, one arm across)
+    if ((leftWrist.y < leftShoulder.y && rightWrist.x < leftShoulder.x) ||
+        (rightWrist.y < rightShoulder.y && leftWrist.x > rightShoulder.x)) {
+        return "dab";
+    }
+    
+    // HANDS ON HIPS
+    if (leftHip && rightHip) {
+        let leftHandOnHip = dist(leftWrist.x, leftWrist.y, leftHip.x, leftHip.y) < 100;
+        let rightHandOnHip = dist(rightWrist.x, rightWrist.y, rightHip.x, rightHip.y) < 100;
+        
+        if (leftHandOnHip && rightHandOnHip) {
+            return "hands_on_hips";
+        }
+    }
+    
+    // ARMS BEHIND HEAD (both wrists near head level, elbows out)
+    if (leftElbow && rightElbow && nose) {
+        if (leftWrist.y < nose.y && rightWrist.y < nose.y && 
+            leftElbow.y < leftWrist.y && rightElbow.y < rightWrist.y &&
+            Math.abs(leftWrist.x - nose.x) < 150 && Math.abs(rightWrist.x - nose.x) < 150) {
+            return "arms_behind_head";
+        }
+    }
+    
+    return "default";
+}
+
+function scalePositionToCanvas(x, y) {
+    // Scale pose coordinates from video resolution to canvas size
+    let videoAspect = video.width / video.height;
+    let canvasAspect = width / height;
+    let scaleX, scaleY, offsetX, offsetY;
+    
+    if (canvasAspect > videoAspect) {
+        scaleX = width / video.width;
+        scaleY = scaleX;
+        offsetX = 0;
+        offsetY = (height - video.height * scaleY) / 2;
+    } else {
+        scaleY = height / video.height;
+        scaleX = scaleY;
+        offsetX = (width - video.width * scaleX) / 2;
+        offsetY = 0;
+    }
+    
+    return {
+        x: x * scaleX + offsetX,
+        y: y * scaleY + offsetY
+    };
+}
+
+function drawKeypoints(pose) {
+    for (let j = 0; j < pose.keypoints.length; j++) {
+        let keypoint = pose.keypoints[j];
+        if (keypoint.confidence > 0.2) {
+            let pos = scalePositionToCanvas(keypoint.x, keypoint.y);
+            fill(0, 255, 0, 150);
+            noStroke();
+            // Mirror the x coordinate
+            ellipse(width - pos.x, pos.y, 8, 8);
+        }
+    }
+}
+
+function drawSkeleton(pose) {
+    let skeleton = [
+        ["nose", "left_eye"],
+        ["left_eye", "left_ear"],
+        ["nose", "right_eye"],
+        ["right_eye", "right_ear"],
+        ["nose", "left_shoulder"],
+        ["nose", "right_shoulder"],
+        ["left_shoulder", "left_elbow"],
+        ["left_elbow", "left_wrist"],
+        ["right_shoulder", "right_elbow"],
+        ["right_elbow", "right_wrist"],
+        ["left_shoulder", "right_shoulder"],
+        ["left_shoulder", "left_hip"],
+        ["right_shoulder", "right_hip"],
+        ["left_hip", "right_hip"],
+        ["left_hip", "left_knee"],
+        ["left_knee", "left_ankle"],
+        ["right_hip", "right_knee"],
+        ["right_knee", "right_ankle"]
+    ];
+    
+    stroke(0, 255, 255, 120);
+    strokeWeight(2);
+    
+    for (let j = 0; j < skeleton.length; j++) {
+        let partA = getKeypoint(pose, skeleton[j][0]);
+        let partB = getKeypoint(pose, skeleton[j][1]);
+        
+        if (partA && partB) {
+            let posA = scalePositionToCanvas(partA.x, partA.y);
+            let posB = scalePositionToCanvas(partB.x, partB.y);
+            // Mirror the x coordinates
+            line(width - posA.x, posA.y, width - posB.x, posB.y);
+        }
+    }
+}
+
+function drawHandKeypoints(hands) {
+    // Draw keypoints for each detected hand
+    for (let i = 0; i < hands.length; i++) {
+        let hand = hands[i];
+        
+        // Draw hand keypoints
+        for (let j = 0; j < hand.keypoints.length; j++) {
+            let keypoint = hand.keypoints[j];
+            let pos = scalePositionToCanvas(keypoint.x, keypoint.y);
+            
+            // Draw green circles for hand keypoints
+            fill(0, 255, 0, 200);
+            noStroke();
+            ellipse(width - pos.x, pos.y, 6, 6);
+        }
+        
+        // Draw hand skeletal connections
+        let connections = handPose.getConnections();
+        stroke(0, 255, 0, 150);
+        strokeWeight(2);
+        
+        for (let j = 0; j < connections.length; j++) {
+            let [indexA, indexB] = connections[j];
+            let keypointA = hand.keypoints[indexA];
+            let keypointB = hand.keypoints[indexB];
+            
+            let posA = scalePositionToCanvas(keypointA.x, keypointA.y);
+            let posB = scalePositionToCanvas(keypointB.x, keypointB.y);
+            
+            // Mirror the x coordinates
+            line(width - posA.x, posA.y, width - posB.x, posB.y);
+        }
+    }
+}
+
+function displayMeme(memeType) {
+    let meme = memes[memeType];
+    
+    // Semi-transparent overlay
+    fill(0, 0, 0, 100);
+    noStroke();
+    rect(0, height - 120, width, 120);
+    
+    // Meme text with Impact font and black outline
+    textAlign(CENTER);
+    textFont('Impact');
+    
+    // Emoji
+    textSize(32);
+    fill(255, 255, 255);
+    stroke(0);
+    strokeWeight(4);
+    text(meme.emoji, width / 2, height - 80);
+    
+    // Text
+    textSize(24);
+    fill(255, 255, 255);
+    stroke(0);
+    strokeWeight(3);
+    text(meme.text.toUpperCase(), width / 2, height - 40);
+    
+    // Add sparkle effect for special poses
+    if (memeType !== "default") {
+        drawSparkles();
+    }
+}
+
+function drawSparkles() {
+    for (let i = 0; i < 3; i++) {
+        let x = random(width);
+        let y = random(height);
+        let size = random(20, 40);
+        
+        fill(255, 255, 255, random(100, 200));
+        noStroke();
+        textSize(size);
+        text("✨", x, y);
+    }
+}
+
+function updateInfoPanel(memeType) {
+    let meme = memes[memeType];
+    document.getElementById('meme-name').textContent = meme.name;
+}
+
+function loadPosesFromJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            
+            // Load memes
+            if (data.memes) {
+                memes = { ...memes, ...data.memes };
+            }
+            
+            // Load custom pose detection
+            if (data.poseDetection) {
+                customPoseDetection = data.poseDetection;
+            }
+            
+            console.log('Loaded poses:', Object.keys(memes));
+            alert(`Successfully loaded ${Object.keys(data.memes || {}).length} custom poses!`);
+        } catch (error) {
+            alert('Error loading JSON file: ' + error.message);
+            console.error(error);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+// Automatically load poses.json on page load
+async function loadDefaultPoses() {
+    try {
+        const response = await fetch('poses.json');
+        if (!response.ok) {
+            console.warn('poses.json not found, using built-in poses');
+            return;
+        }
+        
+        const data = await response.json();
+        
+        // Load memes
+        if (data.memes) {
+            memes = { ...memes, ...data.memes };
+        }
+        
+        // Load custom pose detection
+        if (data.poseDetection) {
+            customPoseDetection = data.poseDetection;
+        }
+        
+        console.log('Automatically loaded poses from poses.json:', Object.keys(data.memes || {}));
+    } catch (error) {
+        console.warn('Could not load poses.json:', error.message);
+    }
+}
+
+// Load poses when page loads
+loadDefaultPoses();
+
+// ========== GAMIFICATION FUNCTIONS ==========
+
+function updateScoreDisplay() {
+    document.getElementById('score').textContent = gameScore;
+    document.getElementById('combo').textContent = comboMultiplier;
+    document.getElementById('pose-count').textContent = poseCounter;
+}
+
+function checkAchievements() {
+    achievements.forEach(ach => {
+        if (!ach.unlocked && ach.check()) {
+            ach.unlocked = true;
+            showAchievement(ach);
+            saveAchievements();
+        }
+    });
+}
+
+function showAchievement(achievement) {
+    const popup = document.getElementById('achievement-popup');
+    const text = document.getElementById('achievement-text');
+    text.textContent = `${achievement.name}: ${achievement.desc}`;
+    popup.classList.add('show');
+    
+    // Play tada sound
+    tadaSound.currentTime = 0;
+    tadaSound.play().catch(e => console.log('Audio play failed:', e));
+    
+    setTimeout(() => {
+        popup.classList.remove('show');
+    }, 3000);
+}
+
+function saveAchievements() {
+    const unlockedIds = achievements.filter(a => a.unlocked).map(a => a.id);
+    localStorage.setItem('achievements', JSON.stringify(unlockedIds));
+}
+
+// ========== MODAL FUNCTIONS ==========
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('show');
+}
+
+function openLeaderboard() {
+    const modal = document.getElementById('leaderboard-modal');
+    const list = document.getElementById('leaderboard-list');
+    
+    // Add current session to leaderboard if score > 0
+    if (gameScore > 0) {
+        const sessionData = {
+            score: gameScore,
+            poses: poseCounter,
+            combo: comboMultiplier,
+            time: Date.now(),
+            uniquePoses: uniquePosesHit.size
+        };
+        
+        leaderboard.push(sessionData);
+        leaderboard.sort((a, b) => b.score - a.score);
+        leaderboard = leaderboard.slice(0, 10); // Keep top 10
+        localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+    }
+    
+    // Display leaderboard
+    list.innerHTML = '';
+    if (leaderboard.length === 0) {
+        list.innerHTML = '<p style="text-align:center; color:#888;">No scores yet. Start posing!</p>';
+    } else {
+        leaderboard.forEach((entry, index) => {
+            const date = new Date(entry.time).toLocaleDateString();
+            const div = document.createElement('div');
+            div.className = 'leaderboard-entry';
+            div.innerHTML = `
+                <div>
+                    <strong>#${index + 1}</strong> - ${entry.score} points
+                    <br><small>${entry.poses} poses, ${entry.combo}x max combo, ${entry.uniquePoses} unique</small>
+                </div>
+                <div style="text-align:right;">
+                    <small>${date}</small>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    }
+    
+    modal.classList.add('show');
+}
+
+function openAchievements() {
+    const modal = document.getElementById('achievements-modal');
+    const list = document.getElementById('achievements-list');
+    
+    list.innerHTML = '';
+    achievements.forEach(ach => {
+        const div = document.createElement('div');
+        div.className = 'achievement-item' + (ach.unlocked ? ' unlocked' : '');
+        div.innerHTML = `
+            <div>
+                ${ach.unlocked ? '🏆' : '🔒'} <strong>${ach.name}</strong>
+                <br><small>${ach.desc}</small>
+            </div>
+            <div>
+                ${ach.unlocked ? '✓ Unlocked' : 'Locked'}
+            </div>
+        `;
+        list.appendChild(div);
+    });
+    
+    modal.classList.add('show');
+}
+
+function openGallery() {
+    const modal = document.getElementById('gallery-modal');
+    const grid = document.getElementById('gallery-grid');
+    
+    grid.innerHTML = '';
+    if (photoGallery.length === 0) {
+        grid.innerHTML = '<p style="text-align:center; color:#888; grid-column: 1/-1;">No photos yet. Strike a pose!</p>';
+    } else {
+        photoGallery.reverse().forEach((photo, index) => {
+            const div = document.createElement('div');
+            div.className = 'gallery-item';
+            const date = new Date(photo.time).toLocaleString();
+            div.innerHTML = `
+                <img src="${photo.data}" alt="Pose ${photo.pose}">
+                <div class="gallery-item-time">${photo.pose} - ${date}</div>
+            `;
+            div.onclick = () => {
+                const win = window.open('');
+                win.document.write(`<img src="${photo.data}" style="max-width:100%; max-height:100vh;">`);
+            };
+            grid.appendChild(div);
+        });
+        photoGallery.reverse(); // Restore order
+    }
+    
+    modal.classList.add('show');
+}
+
+function clearGallery() {
+    if (confirm('Delete all photos? This cannot be undone.')) {
+        photoGallery = [];
+        localStorage.setItem('photoGallery', JSON.stringify(photoGallery));
+        openGallery(); // Refresh
+    }
+}
+
+function downloadAllPhotos() {
+    if (photoGallery.length === 0) {
+        alert('No photos to download!');
+        return;
+    }
+    
+    photoGallery.forEach((photo, index) => {
+        const link = document.createElement('a');
+        link.download = `pose_${photo.pose}_${index + 1}.png`;
+        link.href = photo.data;
+        link.click();
+    });
+}
+
+function openChallenges() {
+    const modal = document.getElementById('challenges-modal');
+    const list = document.getElementById('challenges-list');
+    
+    // Show timer mode section if active
+    if (timerMode) {
+        document.getElementById('timer-mode-section').style.display = 'block';
+    } else {
+        document.getElementById('timer-mode-section').style.display = 'none';
+        
+        // Daily challenges
+        list.innerHTML = `
+            <div class="challenge-box">
+                <h3>🎯 Daily Challenge</h3>
+                <p>Hit 20 different poses in one session</p>
+                <p>Progress: ${uniquePosesHit.size}/20</p>
+            </div>
+            <div class="challenge-box">
+                <h3>⚡ Speed Challenge</h3>
+                <p>Reach 10x combo multiplier</p>
+                <p>Progress: ${comboMultiplier}/10</p>
+            </div>
+            <div class="challenge-box">
+                <h3>💯 Century Challenge</h3>
+                <p>Score 500 points in one session</p>
+                <p>Progress: ${gameScore}/500</p>
+            </div>
+        `;
+    }
+    
+    modal.classList.add('show');
+}
+
+function openHelp() {
+    const modal = document.getElementById('help-modal');
+    const list = document.getElementById('help-pose-list');
+    
+    list.innerHTML = '';
+    
+    // Get all available poses from memes object
+    const poseEntries = Object.entries(memes).filter(([key]) => key !== 'default');
+    
+    if (poseEntries.length === 0) {
+        list.innerHTML = '<p style="text-align:center; color:#888;">No poses loaded. Load a poses.json file!</p>';
+    } else {
+        poseEntries.forEach(([poseId, poseData]) => {
+            const div = document.createElement('div');
+            div.className = 'achievement-item';
+            div.innerHTML = `
+                <div>
+                    ${poseData.emoji || '🎭'} <strong>${poseData.name || poseId}</strong>
+                    <br><small>${poseData.text || 'Strike this pose!'}</small>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    }
+    
+    modal.classList.add('show');
+}
+
+// ========== TIMER MODE FUNCTIONS ==========
+
+function toggleTimerMode() {
+    if (!timerMode) {
+        // Start timer mode
+        timerMode = true;
+        timerStartTime = Date.now();
+        timerPosesRemaining = 10;
+        uniquePosesHit.clear(); // Reset unique poses for this challenge
+        
+        // Update UI
+        document.getElementById('timer-target').textContent = timerPosesRemaining;
+        document.getElementById('timer-remaining').textContent = timerPosesRemaining;
+        
+        // Start timer display
+        timerInterval = setInterval(() => {
+            const elapsed = (Date.now() - timerStartTime) / 1000;
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = Math.floor(elapsed % 60);
+            document.getElementById('timer-display').textContent = 
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }, 100);
+        
+        openChallenges(); // Show challenge modal
+        alert('Timer Challenge Started! Hit 10 different poses as fast as possible!');
+    } else {
+        stopTimerMode();
+    }
+}
+
+function updateTimerMode(poseName) {
+    if (!timerMode) return;
+    
+    // Check if this is a new pose
+    if (!uniquePosesHit.has(poseName)) {
+        timerPosesRemaining--;
+        document.getElementById('timer-remaining').textContent = timerPosesRemaining;
+        
+        // Check if challenge completed
+        if (timerPosesRemaining <= 0) {
+            const elapsed = (Date.now() - timerStartTime) / 1000;
+            clearInterval(timerInterval);
+            timerMode = false;
+            
+            // Show challenge completion popup
+            showChallengeComplete(elapsed);
+            
+            // Check for speedster achievement
+            if (elapsed < 30) {
+                let speedsterAch = achievements.find(a => a.id === 'speedster');
+                if (speedsterAch && !speedsterAch.unlocked) {
+                    speedsterAch.unlocked = true;
+                    showAchievement(speedsterAch);
+                    saveAchievements();
+                }
+            }
+            
+            closeModal('challenges-modal');
+        }
+    }
+}
+
+function showChallengeComplete(elapsed) {
+    const popup = document.getElementById('challenge-popup');
+    const text = document.getElementById('challenge-text');
+    text.textContent = `Time: ${elapsed.toFixed(1)} seconds!`;
+    popup.classList.add('show');
+    
+    // Play tada sound
+    tadaSound.currentTime = 0;
+    tadaSound.play().catch(e => console.log('Audio play failed:', e));
+    
+    setTimeout(() => {
+        popup.classList.remove('show');
+    }, 3000);
+}
+
+function stopTimerMode() {
+    if (timerMode) {
+        clearInterval(timerInterval);
+        timerMode = false;
+        closeModal('challenges-modal');
+    }
+}
+
+// ========== SCREENSHOT FUNCTIONS ==========
+
+function takeScreenshot(autoCapture = false) {
+    // Capture the canvas
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
+    
+    canvas.toBlob(blob => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const photo = {
+                data: reader.result,
+                pose: confirmedMeme,
+                time: Date.now()
+            };
+            
+            photoGallery.push(photo);
+            
+            // Store in localStorage (with size limit check)
+            try {
+                localStorage.setItem('photoGallery', JSON.stringify(photoGallery));
+            } catch (e) {
+                console.warn('Storage full, removing old photos');
+                photoGallery.shift(); // Remove oldest
+                localStorage.setItem('photoGallery', JSON.stringify(photoGallery));
+            }
+            
+            if (!autoCapture) {
+                // Manual screenshot - show notification and download
+                alert('Screenshot saved to gallery!');
+                const link = document.createElement('a');
+                link.download = `pose_${confirmedMeme}_${Date.now()}.png`;
+                link.href = reader.result;
+                link.click();
+            }
+        };
+        reader.readAsDataURL(blob);
+    });
+}
+
+// ========== VIDEO RECORDING FUNCTIONS ==========
+
+function toggleRecording() {
+    if (!isRecording) {
+        startRecording();
+    } else {
+        stopRecording();
+    }
+}
+
+function startRecording() {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
+    
+    const stream = canvas.captureStream(30); // 30 FPS
+    recordedChunks = [];
+    
+    mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=vp9'
+    });
+    
+    mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+            recordedChunks.push(event.data);
+        }
+    };
+    
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `pose_recording_${Date.now()}.webm`;
+        link.href = url;
+        link.click();
+        
+        alert('Recording saved!');
+    };
+    
+    mediaRecorder.start();
+    isRecording = true;
+    
+    // Update button
+    document.querySelector('[onclick="toggleRecording()"]').textContent = '⏹️';
+    document.querySelector('[onclick="toggleRecording()"]').style.background = 'rgba(255, 107, 107, 0.9)';
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        isRecording = false;
+        
+        // Reset button
+        document.querySelector('[onclick="toggleRecording()"]').textContent = '🎥';
+        document.querySelector('[onclick="toggleRecording()"]').style.background = 'rgba(102, 126, 234, 0.9)';
+    }
+}
+
+// Initialize score display
+updateScoreDisplay();
